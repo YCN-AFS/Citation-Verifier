@@ -164,8 +164,12 @@ function buildCard(r, i) {
 
 function buildCardCopyBar(r, index) {
     const num = r.ref_number || index + 1;
+    const corrected = buildSingleCorrected(r, index);
+    // Show only the first line in preview (multi-line for MISMATCH warnings)
+    const previewLine = corrected.split('\n')[0];
+    const preview = previewLine.length > 120 ? previewLine.substring(0, 120) + '...' : previewLine;
     return `<div class="card__copybar">
-        <div class="card__copybar-preview">${esc(buildSingleCorrected(r, index).substring(0, 120))}${buildSingleCorrected(r, index).length > 120 ? '...' : ''}</div>
+        <div class="card__copybar-preview">${esc(preview)}</div>
         <button class="btn btn--accent btn--sm card__copy-single" data-index="${index}" title="Copy trích dẫn [${num}] đã sửa">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V3a1.5 1.5 0 00-1.5-1.5H3A1.5 1.5 0 001.5 3v5A1.5 1.5 0 003 9.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>
             Copy [${num}]
@@ -231,10 +235,20 @@ function buildSingleCorrected(r, index) {
         return `[${num}]. ${authors} (${year}). ${title}${journal}${doi}`;
     }
     if (r.verdict === 'MISMATCH') {
+        if (gt && gt.title) {
+            // Show the ACTUAL paper this DOI points to, with warning
+            const authors = gt.authors && gt.authors.length > 0
+                ? formatAuthors(gt.authors) : (r.cited_authors || 'Unknown');
+            const year = gt.year || r.cited_year || 'n.d.';
+            const journal = gt.source_journal ? `. ${gt.source_journal}` : '';
+            const doi = r.doi ? `. https://doi.org/${r.doi}` : '';
+            const citedTitle = r.cited_title || 'không rõ';
+            return `[${num}]. ⚠️ [SAI LỆCH] ${authors} (${year}). ${gt.title}${journal}${doi}\n      → DOI này trỏ đến bài trên, KHÔNG PHẢI: "${citedTitle}"`;
+        }
         return `[${num}]. ⚠️ [SAI LỆCH - CẦN KIỂM TRA] ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
     }
     if (r.verdict === 'DEAD_DOI') {
-        return `[${num}]. ⚠️ [DOI KHÔNG TỒN TẠI] ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
+        return `[${num}]. ⚠️ [DOI KHÔNG TỒN TẠI - CẦN KIỂM TRA] ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}\n      → DOI ${r.doi || ''} không tìm thấy trên Crossref/DataCite/OpenAlex`;
     }
     return `[${num}]. ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
 }
