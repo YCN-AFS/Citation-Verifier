@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citation Verifier — Automated Academic Citation Verification</title>
+    <meta name="description" content="Production-ready automated citation verification system with multi-API cross-referencing">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Ambient Background -->
+    <div class="ambient">
+        <div class="ambient-orb ambient-orb--1"></div>
+        <div class="ambient-orb ambient-orb--2"></div>
+        <div class="ambient-orb ambient-orb--3"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="nav__inner">
+            <a href="/" class="nav__brand">
+                <div class="nav__logo">
+                    <svg class="nav__logo-icon" viewBox="0 0 28 28" fill="none">
+                        <rect x="2" y="4" width="18" height="22" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <rect x="8" y="2" width="18" height="22" rx="2" fill="var(--accent)" stroke="var(--accent)" stroke-width="1.5"/>
+                        <path d="M13 9h8M13 13h8M13 17h5" stroke="var(--bg-primary)" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="nav__title">Citation Verifier</span>
+                    <span class="nav__version">v1.0</span>
+                </div>
+            </a>
+            <div class="nav__right">
+                <div class="nav__apis">
+                    <span class="api-dot api-dot--cr"></span>Crossref
+                    <span class="api-dot api-dot--dc"></span>DataCite
+                    <span class="api-dot api-dot--oa"></span>OpenAlex
+                </div>
+                <a href="https://github.com" target="_blank" class="nav__github" title="View on GitHub">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+        <div class="hero__inner">
+            <div class="hero__badge">Powered by Multi-API Cross-Referencing</div>
+            <h1 class="hero__title">
+                <span class="hero__title-line">Automated Citation</span>
+                <span class="hero__title-line hero__title-line--accent">Verification System</span>
+            </h1>
+            <p class="hero__desc">Xác minh trích dẫn học thuật với độ chính xác tuyệt đối. Hệ thống đối chiếu chéo 3 cơ sở dữ liệu — phát hiện DOI giả, sai lệch tiêu đề, và metadata không chính xác.</p>
+            <div class="hero__stats">
+                <div class="hero__stat">
+                    <span class="hero__stat-value">3</span>
+                    <span class="hero__stat-label">Academic APIs</span>
+                </div>
+                <div class="hero__stat-divider"></div>
+                <div class="hero__stat">
+                    <span class="hero__stat-value">90%</span>
+                    <span class="hero__stat-label">Verification Threshold</span>
+                </div>
+                <div class="hero__stat-divider"></div>
+                <div class="hero__stat">
+                    <span class="hero__stat-value">0</span>
+                    <span class="hero__stat-label">False Positive Tolerance</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App -->
+    <main class="app">
+        <!-- Input Panel -->
+        <section class="panel" id="inputPanel">
+            <div class="panel__header">
+                <div class="panel__icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h10M3 15h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                    <h2 class="panel__title">Nhập Tài Liệu Tham Khảo</h2>
+                    <p class="panel__subtitle">Dán danh sách trích dẫn — hệ thống tự động trích xuất DOI, tiêu đề, tác giả và đối chiếu chéo</p>
+                </div>
+            </div>
+
+            <div class="editor" id="editor">
+                <div class="editor__toolbar">
+                    <div class="editor__dots">
+                        <span class="editor__dot editor__dot--r"></span>
+                        <span class="editor__dot editor__dot--y"></span>
+                        <span class="editor__dot editor__dot--g"></span>
+                    </div>
+                    <span class="editor__filename">references.txt</span>
+                    <div class="editor__actions">
+                        <span class="editor__count" id="charCount">0 ký tự</span>
+                        <button class="editor__btn" id="clearBtn" title="Xóa nội dung">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <textarea id="refInput" class="editor__textarea" placeholder="[1]. Lewis, P., Perez, E., ... (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. https://doi.org/10.48550/arXiv.2005.11401&#10;[2]. Vaswani, A., Shazeer, N., ... (2017). Attention is all you need. ..." spellcheck="false"></textarea>
+            </div>
+
+            <div class="controls">
+                <label class="switch">
+                    <input type="checkbox" id="crossToggle" checked>
+                    <span class="switch__track"></span>
+                    <span class="switch__label">Cross-validate (OpenAlex)</span>
+                </label>
+                <button class="btn btn--primary" id="verifyBtn">
+                    <svg class="btn__icon" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" stroke-width="2"/><path d="M12 12l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    <span class="btn__text">Xác Minh Trích Dẫn</span>
+                    <div class="btn__loader"><div></div><div></div><div></div></div>
+                </button>
+            </div>
+        </section>
+
+        <!-- Progress -->
+        <section class="progress hidden" id="progressSection">
+            <div class="progress__inner">
+                <div class="progress__ring">
+                    <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" stroke="var(--border)" stroke-width="3" fill="none"/><circle class="progress__circle" cx="22" cy="22" r="20" stroke="var(--accent)" stroke-width="3" fill="none" stroke-dasharray="125.6" stroke-dashoffset="125.6" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                    <p class="progress__title" id="progressTitle">Đang xác minh...</p>
+                    <p class="progress__detail" id="progressDetail">Truy vấn cơ sở dữ liệu học thuật</p>
+                </div>
+            </div>
+            <div class="progress__bar"><div class="progress__fill" id="progressFill"></div></div>
+        </section>
+
+        <!-- Results -->
+        <section class="results hidden" id="resultsSection">
+            <!-- Summary -->
+            <div class="summary" id="summary"></div>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar__views">
+                    <button class="toolbar__btn active" data-view="comparison" id="viewComp">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="1" width="6" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+                        So Sánh
+                    </button>
+                    <button class="toolbar__btn" data-view="list" id="viewList">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3h14M1 8h14M1 13h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Danh Sách
+                    </button>
+                </div>
+                <div class="toolbar__actions">
+                    <button class="btn btn--secondary btn--sm" id="copyOriginalBtn" title="Copy nội dung gốc chưa sửa">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V3a1.5 1.5 0 00-1.5-1.5H3A1.5 1.5 0 001.5 3v5A1.5 1.5 0 003 9.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+                        Copy Gốc
+                    </button>
+                    <button class="btn btn--accent btn--sm" id="copyCorrectedBtn" title="Copy toàn bộ nội dung đã sửa theo dữ liệu API">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4.5 7l2 2 3.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/></svg>
+                        Copy Đã Sửa
+                    </button>
+                    <button class="btn btn--secondary btn--sm" id="exportJsonBtn" title="Xuất báo cáo JSON">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v2a1 1 0 001 1h8a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Export JSON
+                    </button>
+                </div>
+            </div>
+
+            <!-- Diff Banner (shows when there are corrections) -->
+            <div class="diff-banner hidden" id="diffBanner">
+                <div class="diff-banner__icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 1v18M1 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="diff-banner__text">
+                    <strong id="diffCount">0</strong> trích dẫn có thể được sửa dựa trên dữ liệu từ API
+                </div>
+                <button class="btn btn--accent btn--sm" id="diffCopyBtn">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4.5 7l2 2 3.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/></svg>
+                    Copy Bản Đã Sửa
+                </button>
+            </div>
+
+            <!-- Cards -->
+            <div class="cards" id="cardsContainer"></div>
+        </section>
+    </main>
+
+    <!-- Toast -->
+    <div class="toast hidden" id="toast">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="toastMsg">Đã copy!</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer__inner">
+            <p class="footer__text">Built with <span class="footer__heart">♥</span> — Multi-API Cross-Reference Engine</p>
+            <p class="footer__sub">Crossref · DataCite · OpenAlex · RapidFuzz · Zero False-Positive Architecture</p>
+        </div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
