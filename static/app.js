@@ -187,14 +187,14 @@ function buildComp(r) {
         <div class="comp__col">
             <div class="comp__tag comp__tag--original">📝 Trích dẫn gốc (chưa sửa)</div>
             ${cRow('Tiêu đề', r.cited_title, isBad&&titleDiff ? 'comp__value--diff' : '')}
-            ${cRow('DOI', r.doi, 'comp__value--mono')}
+            ${doiRow('DOI', r.doi)}
             ${cRow('Năm', r.cited_year, yearDiff ? 'comp__value--diff' : '')}
             ${cRow('Tác giả', r.cited_authors)}
         </div>
         <div class="comp__col">
             <div class="comp__tag comp__tag--truth">✅ Dữ liệu thực tế (đã sửa)</div>
             ${cRow('Tiêu đề', gt.title, gt.title ? 'comp__value--correct' : 'comp__value--dim')}
-            ${cRow('DOI', gt.doi, 'comp__value--mono')}
+            ${doiRow('DOI', gt.doi)}
             ${cRow('Năm', gt.year, gt.year ? 'comp__value--correct' : '')}
             ${cRow('Tác giả', gt.authors ? gt.authors.join(', ') : null, gt.authors ? 'comp__value--correct' : '')}
             ${gt.source_journal ? cRow('Tạp chí', gt.source_journal) : ''}
@@ -206,6 +206,13 @@ function buildComp(r) {
 function cRow(label, value, cls='') {
     const disp = value != null && value !== '' ? esc(String(value)) : '<span class="comp__value--dim">—</span>';
     return `<div class="comp__row"><div class="comp__label">${label}</div><div class="comp__value ${cls}">${disp}</div></div>`;
+}
+
+function doiRow(label, doi) {
+    if (!doi) return cRow(label, null, 'comp__value--mono');
+    const url = doi.startsWith('http') ? doi : `https://doi.org/${doi}`;
+    const display = doi.replace(/^https?:\/\/doi\.org\//, '');
+    return `<div class="comp__row"><div class="comp__label">${label}</div><div class="comp__value comp__value--mono"><a href="${esc(url)}" target="_blank" rel="noopener" class="doi-link">${esc(display)} ↗</a></div></div>`;
 }
 
 function buildScores(r) {
@@ -236,19 +243,19 @@ function buildSingleCorrected(r, index) {
     }
     if (r.verdict === 'MISMATCH') {
         if (gt && gt.title) {
-            // Show the ACTUAL paper this DOI points to, with warning
+            // Build corrected reference using API data + warning about what changed
             const authors = gt.authors && gt.authors.length > 0
                 ? formatAuthors(gt.authors) : (r.cited_authors || 'Unknown');
             const year = gt.year || r.cited_year || 'n.d.';
             const journal = gt.source_journal ? `. ${gt.source_journal}` : '';
             const doi = r.doi ? `. https://doi.org/${r.doi}` : '';
             const citedTitle = r.cited_title || 'không rõ';
-            return `[${num}]. ⚠️ [SAI LỆCH] ${authors} (${year}). ${gt.title}${journal}${doi}\n      → DOI này trỏ đến bài trên, KHÔNG PHẢI: "${citedTitle}"`;
+            return `[${num}]. ${authors} (${year}). ${gt.title}${journal}${doi}\n      ⚠️ [ĐÃ SỬA] Tiêu đề gốc: "${citedTitle}" → DOI thực tế trỏ đến bài trên`;
         }
         return `[${num}]. ⚠️ [SAI LỆCH - CẦN KIỂM TRA] ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
     }
     if (r.verdict === 'DEAD_DOI') {
-        return `[${num}]. ⚠️ [DOI KHÔNG TỒN TẠI - CẦN KIỂM TRA] ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}\n      → DOI ${r.doi || ''} không tìm thấy trên Crossref/DataCite/OpenAlex`;
+        return `[${num}]. ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}\n      ⚠️ [CẢNH BÁO] DOI ${r.doi || ''} không tìm thấy trên Crossref/DataCite/OpenAlex`;
     }
     return `[${num}]. ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
 }

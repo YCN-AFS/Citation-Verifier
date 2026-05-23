@@ -207,6 +207,8 @@ body{font-family:var(--font);background:var(--bg-primary);color:var(--text);min-
 .comp__value--diff{color:var(--red);text-decoration:line-through;opacity:.7}
 .comp__value--correct{color:var(--green)}
 .comp__value--dim{color:var(--text-dim);font-style:italic}
+.doi-link{color:var(--accent);text-decoration:none;transition:all var(--transition);border-bottom:1px solid transparent}
+.doi-link:hover{border-bottom-color:var(--accent);filter:brightness(1.2)}
 
 /* Scores */
 .scores{display:flex;flex-wrap:wrap;gap:.75rem;padding:.7rem 1.15rem;border-top:1px solid var(--border);background:rgba(0,0,0,.15)}
