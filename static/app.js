@@ -232,7 +232,8 @@ function buildSingleCorrected(r, index) {
     const num = r.ref_number || index + 1;
     const gt = r.ground_truth;
 
-    if (gt && gt.title && (r.verdict === 'VERIFIED' || r.verdict === 'TITLE_MATCHED' || r.verdict === 'SUSPICIOUS')) {
+    // If we have ground truth data from API, build a clean corrected reference
+    if (gt && gt.title) {
         const authors = gt.authors && gt.authors.length > 0
             ? formatAuthors(gt.authors) : (r.cited_authors || 'Unknown');
         const year = gt.year || r.cited_year || 'n.d.';
@@ -241,22 +242,8 @@ function buildSingleCorrected(r, index) {
         const doi = gt.doi ? `. https://doi.org/${gt.doi}` : (r.doi ? `. https://doi.org/${r.doi}` : '');
         return `[${num}]. ${authors} (${year}). ${title}${journal}${doi}`;
     }
-    if (r.verdict === 'MISMATCH') {
-        if (gt && gt.title) {
-            // Build corrected reference using API data + warning about what changed
-            const authors = gt.authors && gt.authors.length > 0
-                ? formatAuthors(gt.authors) : (r.cited_authors || 'Unknown');
-            const year = gt.year || r.cited_year || 'n.d.';
-            const journal = gt.source_journal ? `. ${gt.source_journal}` : '';
-            const doi = r.doi ? `. https://doi.org/${r.doi}` : '';
-            const citedTitle = r.cited_title || 'không rõ';
-            return `[${num}]. ${authors} (${year}). ${gt.title}${journal}${doi}\n      ⚠️ [ĐÃ SỬA] Tiêu đề gốc: "${citedTitle}" → DOI thực tế trỏ đến bài trên`;
-        }
-        return `[${num}]. ⚠️ [SAI LỆCH - CẦN KIỂM TRA] ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
-    }
-    if (r.verdict === 'DEAD_DOI') {
-        return `[${num}]. ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}\n      ⚠️ [CẢNH BÁO] DOI ${r.doi || ''} không tìm thấy trên Crossref/DataCite/OpenAlex`;
-    }
+
+    // No ground truth available — keep original text
     return `[${num}]. ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
 }
 
@@ -326,13 +313,28 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function shake(el) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'shake .4s ease'; setTimeout(() => el.style.animation = '', 500); }
 
 function copyToClipboard(text, msg) {
-    navigator.clipboard.writeText(text).then(() => showToast(msg)).catch(() => {
-        // Fallback
+    // Use fallback textarea method first — works on HTTP localhost
+    try {
         const ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-        document.body.removeChild(ta); showToast(msg);
-    });
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) { showToast(msg); return; }
+    } catch(e) { /* fallback failed, try clipboard API */ }
+
+    // Try modern Clipboard API (requires HTTPS or localhost)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => showToast(msg))
+            .catch(() => showToast('❌ Copy thất bại — thử HTTPS'));
+    } else {
+        showToast('❌ Copy thất bại — trình duyệt không hỗ trợ');
+    }
 }
 
 function showToast(msg) {
