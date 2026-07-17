@@ -2,14 +2,20 @@
 Core verification orchestrator.
 
 Coordinates the full verification pipeline for each reference:
-    1. Route DOI to the correct primary API
-    2. Fetch ground truth from the primary source
-    3. Compare cited text against ground truth
-    4. Optionally cross-validate with OpenAlex
-    5. Handle references without DOIs via title search
+    1. Check DOI cache for existing results
+    2. Route DOI to the correct primary API
+    3. Fetch ground truth from the primary source
+    4. Compare cited text against ground truth
+    5. Optionally cross-validate with OpenAlex
+    6. Handle references without DOIs via title search
+
+Performance features:
+    - Parallel verification via ThreadPoolExecutor (5 workers)
+    - DOI cache layer (7-day TTL) to avoid redundant API calls
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 from .api_clients import (
@@ -18,6 +24,7 @@ from .api_clients import (
     OpenAlexClient,
     route_doi_to_api,
 )
+from .cache import get_cached, set_cached
 from .comparator import compare
 from .config import (
     GroundTruth,
@@ -29,6 +36,9 @@ from .normalizer import normalize_title
 from .parser import parse_references
 
 logger = logging.getLogger(__name__)
+
+# Max parallel workers — balances speed vs. API rate limits
+_MAX_WORKERS = 5
 
 
 class CitationVerifier:
@@ -60,6 +70,9 @@ class CitationVerifier:
         """
         Verify all references found in raw text.
 
+        Uses parallel execution for references with DOIs to maximize
+        throughput. Results are returned in original reference order.
+
         Args:
             text: Raw multiline text containing academic references.
 
@@ -69,10 +82,32 @@ class CitationVerifier:
         references = parse_references(text)
         logger.info("Parsed %d references from input text.", len(references))
 
-        results = []
-        for ref in references:
-            result = self._verify_single(ref)
-            results.append(result)
+        if not references:
+            return []
+
+        # For small batches (<=3), process sequentially to reduce overhead
+        if len(references) <= 3:
+            return [self._verify_single(ref) for ref in references]
+
+        # Parallel verification for larger batches
+        results = [None] * len(references)
+
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+            future_to_idx = {
+                executor.submit(self._verify_single, ref): i
+                for i, ref in enumerate(references)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                try:
+                    results[idx] = future.result()
+                except Exception as e:
+                    logger.error("Verification failed for ref %d: %s", idx + 1, e)
+                    results[idx] = VerificationResult(
+                        reference=references[idx],
+                        verdict=Verdict.API_ERROR,
+                        error_message=f"Verification error: {str(e)}",
+                    )
 
         return results
 
@@ -81,7 +116,7 @@ class CitationVerifier:
         Verify a single parsed reference.
 
         Workflow:
-            1. If DOI present → fetch from primary API → compare
+            1. If DOI present → check cache → fetch from API → compare
             2. If primary fails → try other APIs
             3. If no DOI → search by title via OpenAlex
             4. Optionally cross-validate with OpenAlex
@@ -110,11 +145,13 @@ class CitationVerifier:
         Verify a reference that has a DOI.
 
         Strategy:
+            0. Check cache first
             1. Route to primary API (Crossref or DataCite)
             2. If primary fails, try the other API
             3. If both fail, try OpenAlex
-            4. Compare title from API against cited text
-            5. Cross-validate with OpenAlex if enabled
+            4. Cache the result
+            5. Compare title from API against cited text
+            6. Cross-validate with OpenAlex if enabled
 
         Args:
             ref: Parsed reference with a DOI.
@@ -124,30 +161,41 @@ class CitationVerifier:
             Updated VerificationResult.
         """
         doi = ref.doi
-        primary = route_doi_to_api(doi)
         ground_truth = None
 
+        # Step 0: Check cache
+        cached = get_cached(doi)
+        if cached is not None:
+            ground_truth = cached
+            logger.info("Cache HIT for DOI: %s (%s)", doi, cached.api_source)
+
         # Step 1: Try primary API
-        if primary == "Crossref":
-            ground_truth = self.crossref.fetch_by_doi(doi)
-            fallback_client = self.datacite
-            fallback_name = "DataCite"
-        else:
-            ground_truth = self.datacite.fetch_by_doi(doi)
-            fallback_client = self.crossref
-            fallback_name = "Crossref"
-
-        # Step 2: If primary fails, try fallback
         if ground_truth is None:
-            logger.info("Primary API (%s) returned nothing. Trying %s...", primary, fallback_name)
-            ground_truth = fallback_client.fetch_by_doi(doi)
+            primary = route_doi_to_api(doi)
+            if primary == "Crossref":
+                ground_truth = self.crossref.fetch_by_doi(doi)
+                fallback_client = self.datacite
+                fallback_name = "DataCite"
+            else:
+                ground_truth = self.datacite.fetch_by_doi(doi)
+                fallback_client = self.crossref
+                fallback_name = "Crossref"
 
-        # Step 3: If both fail, try OpenAlex
-        if ground_truth is None:
-            logger.info("Crossref + DataCite failed. Trying OpenAlex...")
-            ground_truth = self.openalex.fetch_by_doi(doi)
+            # Step 2: If primary fails, try fallback
+            if ground_truth is None:
+                logger.info("Primary API (%s) returned nothing. Trying %s...", primary, fallback_name)
+                ground_truth = fallback_client.fetch_by_doi(doi)
 
-        # Step 4: Evaluate result
+            # Step 3: If both fail, try OpenAlex
+            if ground_truth is None:
+                logger.info("Crossref + DataCite failed. Trying OpenAlex...")
+                ground_truth = self.openalex.fetch_by_doi(doi)
+
+            # Step 4: Cache successful result
+            if ground_truth is not None:
+                set_cached(doi, ground_truth)
+
+        # Step 5: Evaluate result
         if ground_truth is None:
             # DOI exists in none of the APIs → DEAD_DOI
             result.verdict = Verdict.DEAD_DOI
@@ -157,7 +205,7 @@ class CitationVerifier:
 
         result.ground_truth = ground_truth
 
-        # Step 5: Compare title
+        # Step 6: Compare title
         if ground_truth.title:
             comparison = compare(ref, ground_truth)
             result.comparison = comparison
@@ -167,7 +215,7 @@ class CitationVerifier:
             result.verdict = Verdict.SUSPICIOUS
             result.error_message = "API returned metadata but no title."
 
-        # Step 6: Cross-validate with OpenAlex (if enabled and primary wasn't OpenAlex)
+        # Step 7: Cross-validate with OpenAlex (if enabled and primary wasn't OpenAlex)
         if self.cross_validate and ground_truth.api_source != "OpenAlex":
             result = self._cross_validate_with_openalex(ref, result)
 

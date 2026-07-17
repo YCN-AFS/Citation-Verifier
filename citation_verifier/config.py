@@ -5,6 +5,7 @@ All tunable parameters — API endpoints, timeouts, retry policies,
 fuzzy-matching thresholds — are defined here as module-level constants.
 """
 
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -38,16 +39,19 @@ THRESHOLD_SUSPICIOUS = 70   # Score 70–89 → SUSPICIOUS (manual review)
 # API Configuration
 # ─────────────────────────────────────────────────────────────────────
 
+# Polite pool email — set CITEGUARD_MAILTO env var for production
+_MAILTO = os.getenv("CITEGUARD_MAILTO", "citeguard@giize.com")
+
 # Crossref (primary for journal/conference DOIs)
 CROSSREF_API_BASE = "https://api.crossref.org/works"
-CROSSREF_MAILTO = "admin@example.com"  # For polite pool access
+CROSSREF_MAILTO = _MAILTO
 
 # DataCite (primary for arXiv / preprint DOIs)
 DATACITE_API_BASE = "https://api.datacite.org/dois"
 
 # OpenAlex (cross-validator and fallback for title search)
 OPENALEX_API_BASE = "https://api.openalex.org/works"
-OPENALEX_MAILTO = "admin@example.com"  # Polite pool
+OPENALEX_MAILTO = _MAILTO
 
 # DOI prefix routing: DOIs starting with these prefixes → DataCite
 DATACITE_DOI_PREFIXES = ("10.48550",)  # arXiv

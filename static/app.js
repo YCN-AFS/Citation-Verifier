@@ -1,6 +1,7 @@
 /**
- * Citation Verifier — Premium Web App
- * Handles verification, comparison rendering, and copy corrected content.
+ * CiteGuard — Web Application
+ * Handles verification, comparison rendering, copy corrected content,
+ * and animated global stats counters.
  */
 const $ = id => document.getElementById(id);
 
@@ -16,17 +17,19 @@ const copyOriginalBtn = $('copyOriginalBtn'), copyCorrectedBtn = $('copyCorrecte
 const exportJsonBtn = $('exportJsonBtn'), diffBanner = $('diffBanner');
 const diffCount = $('diffCount'), diffCopyBtn = $('diffCopyBtn');
 const toast = $('toast'), toastMsg = $('toastMsg');
+const historyBtn = $('historyBtn'), historyDropdown = $('historyDropdown');
+const historyCount = $('historyCount'), editor = $('editor');
 
 let data = null, view = 'comparison';
 
 const V = {
-    VERIFIED:      { icon:'✅', vi:'Xác minh',     css:'verified' },
-    SUSPICIOUS:    { icon:'⚠️', vi:'Nghi ngờ',      css:'suspicious' },
-    MISMATCH:      { icon:'❌', vi:'Sai lệch',     css:'mismatch' },
-    DEAD_DOI:      { icon:'💀', vi:'DOI ảo',       css:'dead_doi' },
-    NO_DOI:        { icon:'🔍', vi:'Không DOI',    css:'no_doi' },
-    TITLE_MATCHED: { icon:'📗', vi:'Khớp tiêu đề', css:'title_matched' },
-    API_ERROR:     { icon:'🔌', vi:'Lỗi API',      css:'api_error' },
+    VERIFIED:      { vi:'Xác minh',     css:'verified' },
+    SUSPICIOUS:    { vi:'Nghi ngờ',      css:'suspicious' },
+    MISMATCH:      { vi:'Sai lệch',     css:'mismatch' },
+    DEAD_DOI:      { vi:'DOI không tồn tại', css:'dead_doi' },
+    NO_DOI:        { vi:'Không có DOI',  css:'no_doi' },
+    TITLE_MATCHED: { vi:'Khớp tiêu đề', css:'title_matched' },
+    API_ERROR:     { vi:'Lỗi API',      css:'api_error' },
 };
 
 const SORDER = [
@@ -39,7 +42,35 @@ const SORDER = [
     {k:'TITLE_MATCHED',l:'Khớp tiêu đề',c:'s-matched'},
 ];
 
-// Events
+// ─── Global Stats Counter ────────────────────────────────────
+function fetchStats() {
+    fetch('/api/stats')
+        .then(r => r.json())
+        .then(stats => {
+            animateCounter($('counterRefs'), stats.total_references || 0);
+            animateCounter($('counterSessions'), stats.total_sessions || 0);
+        })
+        .catch(() => { /* silently fail — counters stay at 0 */ });
+}
+
+function animateCounter(el, target, duration = 1800) {
+    if (!el || target === 0) { if (el) el.textContent = '0'; return; }
+    let start = null;
+    const step = ts => {
+        if (!start) start = ts;
+        const progress = Math.min((ts - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        el.textContent = Math.floor(eased * target).toLocaleString('vi-VN');
+        if (progress < 1) requestAnimationFrame(step);
+        else el.textContent = target.toLocaleString('vi-VN');
+    };
+    requestAnimationFrame(step);
+}
+
+// Fetch stats on page load
+fetchStats();
+
+// ─── Events ──────────────────────────────────────────────────
 refInput.addEventListener('input', () => charCount.textContent = refInput.value.length + ' ký tự');
 clearBtn.addEventListener('click', () => { refInput.value = ''; charCount.textContent = '0 ký tự'; refInput.focus(); });
 verifyBtn.addEventListener('click', doVerify);
@@ -50,7 +81,7 @@ copyCorrectedBtn.addEventListener('click', () => copyCorrected());
 diffCopyBtn.addEventListener('click', () => copyCorrected());
 exportJsonBtn.addEventListener('click', () => exportJSON());
 
-// Verify
+// ─── Verify ──────────────────────────────────────────────────
 async function doVerify() {
     const text = refInput.value.trim();
     if (!text) { shake(refInput.closest('.editor')); return; }
@@ -76,6 +107,8 @@ async function doVerify() {
         data = await r.json();
         await sleep(350);
         render();
+        // Refresh counters after successful verification
+        fetchStats();
     } catch(e) {
         clearInterval(anim);
         progressTitle.textContent = '❌ Lỗi';
@@ -95,7 +128,7 @@ function animProgress() {
     }, 700);
 }
 
-// Render
+// ─── Render ──────────────────────────────────────────────────
 function render() {
     progressSec.classList.add('hidden');
     resultsSec.classList.remove('hidden');
@@ -126,7 +159,6 @@ function renderCards() {
             const r = data.results[idx];
             const text = buildSingleCorrected(r, idx);
             copyToClipboard(text, `Đã copy trích dẫn [${r.ref_number || idx+1}]!`);
-            // Animate the button
             btn.classList.add('copied');
             const orig = btn.innerHTML;
             btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 7l2.5 2.5L10 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Đã copy!';
@@ -139,13 +171,13 @@ function buildCard(r, i) {
     const v = V[r.verdict] || V.API_ERROR;
     const num = r.ref_number || i+1;
     const sc = r.scores ? r.scores.final : null;
-    const body = view === 'comparison' ? buildComp(r) : `<div style="padding:1rem 1.25rem;font-family:var(--mono);font-size:.78rem;color:var(--text-secondary);line-height:1.7;word-break:break-word">${esc(r.raw_text)}</div>`;
+    const body = view === 'comparison' ? buildComp(r) : `<div style="padding:1rem 1.25rem;font-family:var(--mono);font-size:.76rem;color:var(--text-secondary);line-height:1.7;word-break:break-word">${esc(r.raw_text)}</div>`;
 
     return `<div class="card" style="animation-delay:${Math.min(i*.04,.8)}s">
         <div class="card__header">
             <div class="card__left">
                 <span class="card__num">[${num}]</span>
-                <span class="badge badge--${v.css}">${v.icon} ${v.vi}</span>
+                <span class="badge badge--${v.css}">${v.vi}</span>
             </div>
             <div class="card__right">
                 ${sc !== null ? `<span class="card__score" style="color:${sColor(sc)}">${sc.toFixed(1)}%</span>` : ''}
@@ -157,7 +189,7 @@ function buildCard(r, i) {
             ${body}
             ${buildCardCopyBar(r, i)}
             ${buildScores(r)}
-            ${r.error ? `<div class="card__error">⚠ ${esc(r.error)}</div>` : ''}
+            ${r.error ? `<div class="card__error">${esc(r.error)}</div>` : ''}
         </div>
     </div>`;
 }
@@ -165,7 +197,6 @@ function buildCard(r, i) {
 function buildCardCopyBar(r, index) {
     const num = r.ref_number || index + 1;
     const corrected = buildSingleCorrected(r, index);
-    // Show only the first line in preview (multi-line for MISMATCH warnings)
     const previewLine = corrected.split('\n')[0];
     const preview = previewLine.length > 120 ? previewLine.substring(0, 120) + '...' : previewLine;
     return `<div class="card__copybar">
@@ -185,14 +216,14 @@ function buildComp(r) {
 
     return `<div class="comp">
         <div class="comp__col">
-            <div class="comp__tag comp__tag--original">📝 Trích dẫn gốc (chưa sửa)</div>
+            <div class="comp__tag comp__tag--original">Trích dẫn gốc</div>
             ${cRow('Tiêu đề', r.cited_title, isBad&&titleDiff ? 'comp__value--diff' : '')}
             ${doiRow('DOI', r.doi)}
             ${cRow('Năm', r.cited_year, yearDiff ? 'comp__value--diff' : '')}
             ${cRow('Tác giả', r.cited_authors)}
         </div>
         <div class="comp__col">
-            <div class="comp__tag comp__tag--truth">✅ Dữ liệu thực tế (đã sửa)</div>
+            <div class="comp__tag comp__tag--truth">Dữ liệu API</div>
             ${cRow('Tiêu đề', gt.title, gt.title ? 'comp__value--correct' : 'comp__value--dim')}
             ${doiRow('DOI', gt.doi)}
             ${cRow('Năm', gt.year, gt.year ? 'comp__value--correct' : '')}
@@ -222,17 +253,16 @@ function buildScores(r) {
         <div class="scores__item"><span class="scores__label">Ratio</span><span class="scores__val" style="color:${sColor(s.ratio)}">${s.ratio.toFixed(1)}</span></div>
         <div class="scores__item"><span class="scores__label">Token Sort</span><span class="scores__val" style="color:${sColor(s.token_sort)}">${s.token_sort.toFixed(1)}</span></div>
         <div class="scores__item"><span class="scores__label">Token Set</span><span class="scores__val" style="color:${sColor(s.token_set)}">${s.token_set.toFixed(1)}</span></div>
-        <div class="scores__item"><span class="scores__label">Final</span><span class="scores__val" style="color:${sColor(s.final)};font-size:.85rem">${s.final.toFixed(1)}%</span></div>
+        <div class="scores__item"><span class="scores__label">Final</span><span class="scores__val" style="color:${sColor(s.final)};font-size:.82rem">${s.final.toFixed(1)}%</span></div>
         ${s.year_match !== null ? `<div class="scores__item"><span class="scores__label">Năm</span><span class="scores__val" style="color:${s.year_match?'var(--green)':'var(--red)'}">${s.year_match?'✓ Khớp':'✗ Lệch'}</span></div>` : ''}
     </div>`;
 }
 
-// ─── Copy Corrected Content ─────────────────────────────────────
+// ─── Copy Corrected Content ─────────────────────────────────
 function buildSingleCorrected(r, index) {
     const num = r.ref_number || index + 1;
     const gt = r.ground_truth;
 
-    // If we have ground truth data from API, build a clean corrected reference
     if (gt && gt.title) {
         const authors = gt.authors && gt.authors.length > 0
             ? formatAuthors(gt.authors) : (r.cited_authors || 'Unknown');
@@ -243,7 +273,6 @@ function buildSingleCorrected(r, index) {
         return `[${num}]. ${authors} (${year}). ${title}${journal}${doi}`;
     }
 
-    // No ground truth available — keep original text
     return `[${num}]. ${r.raw_text.replace(/^\[\d+\]\.?\s*/, '')}`;
 }
 
@@ -273,7 +302,7 @@ function exportJSON() {
     const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'verification_report.json'; a.click();
+    a.href = url; a.download = 'citeguard_report.json'; a.click();
     URL.revokeObjectURL(url);
     showToast('Đã xuất báo cáo JSON!');
 }
@@ -298,7 +327,7 @@ function showDiffBanner() {
     }
 }
 
-// ─── View Switch ─────────────────────────────────────────────────
+// ─── View Switch ─────────────────────────────────────────────
 function setView(v) {
     view = v;
     document.querySelectorAll('.toolbar__btn').forEach(b => b.classList.remove('active'));
@@ -306,14 +335,13 @@ function setView(v) {
     if (data) renderCards();
 }
 
-// ─── Utilities ───────────────────────────────────────────────────
+// ─── Utilities ───────────────────────────────────────────────
 function sColor(s) { return s >= 90 ? 'var(--green)' : s >= 70 ? 'var(--yellow)' : 'var(--red)'; }
 function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function shake(el) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'shake .4s ease'; setTimeout(() => el.style.animation = '', 500); }
 
 function copyToClipboard(text, msg) {
-    // Use fallback textarea method first — works on HTTP localhost
     try {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -325,9 +353,8 @@ function copyToClipboard(text, msg) {
         const ok = document.execCommand('copy');
         document.body.removeChild(ta);
         if (ok) { showToast(msg); return; }
-    } catch(e) { /* fallback failed, try clipboard API */ }
+    } catch(e) { /* fallback failed */ }
 
-    // Try modern Clipboard API (requires HTTPS or localhost)
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text)
             .then(() => showToast(msg))
@@ -350,9 +377,184 @@ sty.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}25%{transfor
 document.head.appendChild(sty);
 
 // Nav scroll effect
-let lastScroll = 0;
 window.addEventListener('scroll', () => {
     const nav = $('nav');
-    if (window.scrollY > 50) nav.style.borderBottomColor = 'rgba(255,255,255,0.08)';
-    else nav.style.borderBottomColor = 'rgba(255,255,255,0.04)';
+    if (window.scrollY > 50) nav.style.borderBottomColor = 'rgba(0,0,0,0.08)';
+    else nav.style.borderBottomColor = 'var(--border)';
+});
+
+// ─── History ─────────────────────────────────────────────────
+let historyOpen = false;
+
+historyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    historyOpen = !historyOpen;
+    if (historyOpen) { fetchHistory(); historyDropdown.classList.remove('hidden'); }
+    else { historyDropdown.classList.add('hidden'); }
+});
+
+document.addEventListener('click', (e) => {
+    if (historyOpen && !historyDropdown.contains(e.target) && !historyBtn.contains(e.target)) {
+        historyOpen = false;
+        historyDropdown.classList.add('hidden');
+    }
+});
+
+function fetchHistory() {
+    fetch('/api/history')
+        .then(r => r.json())
+        .then(sessions => {
+            if (sessions.length > 0) {
+                historyCount.textContent = sessions.length;
+                historyCount.classList.remove('hidden');
+            } else {
+                historyCount.classList.add('hidden');
+            }
+            renderHistory(sessions);
+        })
+        .catch(() => {});
+}
+
+function renderHistory(sessions) {
+    if (sessions.length === 0) {
+        historyDropdown.innerHTML = `
+            <div class="history-dropdown__header">
+                <span class="history-dropdown__title">Lịch sử xác minh</span>
+            </div>
+            <div class="history-dropdown__empty">Chưa có lịch sử nào</div>`;
+        return;
+    }
+
+    const items = sessions.map(s => {
+        const sumParts = [];
+        if (s.summary.VERIFIED) sumParts.push(`${s.summary.VERIFIED} verified`);
+        if (s.summary.SUSPICIOUS) sumParts.push(`${s.summary.SUSPICIOUS} suspicious`);
+        if (s.summary.MISMATCH) sumParts.push(`${s.summary.MISMATCH} mismatch`);
+        if (s.summary.DEAD_DOI) sumParts.push(`${s.summary.DEAD_DOI} dead`);
+        const sumText = sumParts.join(', ') || '';
+        const statusDot = s.has_critical ? 'api-dot--cr' : 'api-dot--oa';
+        return `<div class="history-item" data-id="${s.id}">
+            <span class="history-item__icon"><span class="api-dot ${statusDot}" style="width:8px;height:8px"></span></span>
+            <div class="history-item__info">
+                <div class="history-item__refs">${s.total_refs} tài liệu${sumText ? ' — ' + sumText : ''}</div>
+                <div class="history-item__preview">${esc(s.input_preview)}</div>
+            </div>
+            <span class="history-item__time">${timeAgo(s.created_at)}</span>
+            <button class="history-item__delete" data-id="${s.id}" title="Xóa">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>`;
+    }).join('');
+
+    historyDropdown.innerHTML = `
+        <div class="history-dropdown__header">
+            <span class="history-dropdown__title">Lịch sử xác minh</span>
+            <button class="history-dropdown__clear" id="clearHistoryBtn">Xóa tất cả</button>
+        </div>
+        ${items}`;
+
+    // Wire click-to-load
+    historyDropdown.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.history-item__delete')) return;
+            loadSession(item.dataset.id);
+        });
+    });
+
+    // Wire delete buttons
+    historyDropdown.querySelectorAll('.history-item__delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteSession(btn.dataset.id);
+        });
+    });
+
+    // Wire clear all
+    const clearBtn2 = $('clearHistoryBtn');
+    if (clearBtn2) clearBtn2.addEventListener('click', clearAllHistory);
+}
+
+function loadSession(id) {
+    historyOpen = false;
+    historyDropdown.classList.add('hidden');
+    showToast('Đang tải...');
+
+    fetch(`/api/history/${id}`)
+        .then(r => r.json())
+        .then(sessionData => {
+            if (sessionData.error) { showToast('Lỗi: ' + sessionData.error); return; }
+            data = sessionData;
+            render();
+            showToast('Đã tải kết quả từ lịch sử');
+        })
+        .catch(() => showToast('Không thể tải session'));
+}
+
+function deleteSession(id) {
+    fetch(`/api/history/${id}`, { method: 'DELETE' })
+        .then(() => { fetchHistory(); showToast('Đã xóa'); })
+        .catch(() => showToast('Xóa thất bại'));
+}
+
+function clearAllHistory() {
+    fetch('/api/history', { method: 'DELETE' })
+        .then(() => { fetchHistory(); showToast('Đã xóa tất cả lịch sử'); })
+        .catch(() => showToast('Xóa thất bại'));
+}
+
+function timeAgo(ts) {
+    const diff = (Date.now() / 1000) - ts;
+    if (diff < 60) return 'vừa xong';
+    if (diff < 3600) return Math.floor(diff / 60) + ' phút';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' giờ';
+    if (diff < 604800) return Math.floor(diff / 86400) + ' ngày';
+    return new Date(ts * 1000).toLocaleDateString('vi-VN');
+}
+
+// Load history count on page load
+fetchHistory();
+
+// ─── Drag & Drop File Upload ─────────────────────────────────
+['dragenter', 'dragover'].forEach(evt => {
+    editor.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        editor.classList.add('editor--dragover');
+    });
+});
+
+['dragleave', 'drop'].forEach(evt => {
+    editor.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        editor.classList.remove('editor--dragover');
+    });
+});
+
+editor.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const ext = file.name.split('.').pop().toLowerCase();
+    const allowed = ['txt', 'bib', 'ris', 'csv', 'md'];
+
+    if (!allowed.includes(ext) && !file.type.startsWith('text/')) {
+        showToast(`Không hỗ trợ file .${ext} — Dùng .txt, .bib, .ris`);
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        refInput.value = ev.target.result;
+        charCount.textContent = refInput.value.length + ' ký tự';
+        showToast(`Đã tải ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+
+        // Update filename display
+        const filenameEl = editor.querySelector('.editor__filename');
+        if (filenameEl) filenameEl.textContent = file.name;
+    };
+    reader.readAsText(file, 'utf-8');
 });

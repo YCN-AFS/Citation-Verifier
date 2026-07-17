@@ -14,6 +14,14 @@ from datetime import datetime
 from flask import Flask, jsonify, render_template, request
 
 from citation_verifier.config import Verdict, VerificationResult
+from citation_verifier.history import (
+    clear_all_sessions,
+    delete_session,
+    get_session,
+    list_sessions,
+    save_session,
+)
+from citation_verifier.stats import get_stats, increment_stats
 from citation_verifier.verifier import CitationVerifier
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -27,6 +35,24 @@ logger = logging.getLogger(__name__)
 def index():
     """Serve the main web interface."""
     return render_template("index.html")
+
+
+@app.route("/api/stats")
+def stats():
+    """Return global usage statistics for the hero counter."""
+    return jsonify(get_stats())
+
+
+@app.route("/api/health")
+def health():
+    """Health check endpoint for monitoring."""
+    from citation_verifier.cache import get_cache_stats
+    return jsonify({
+        "status": "healthy",
+        "version": "1.1.0",
+        "cache": get_cache_stats(),
+        "stats": get_stats(),
+    })
 
 
 @app.route("/api/verify", methods=["POST"])
@@ -50,7 +76,17 @@ def verify():
     try:
         verifier = CitationVerifier(cross_validate=cross_validate)
         results = verifier.verify_text(text)
-        return jsonify(_serialize_results(results))
+        increment_stats(len(results))
+        response = _serialize_results(results)
+        # Save to history
+        save_session(
+            total=response["total"],
+            summary=response["summary"],
+            has_critical=response["has_critical"],
+            input_text=text,
+            results_data=response,
+        )
+        return jsonify(response)
     except Exception as e:
         logger.error("Verification error: %s", e, exc_info=True)
         return jsonify({"error": f"Verification failed: {str(e)}"}), 500
@@ -112,6 +148,37 @@ def _serialize_results(results: list) -> dict:
         ),
         "results": serialized,
     }
+
+
+# ─── History API ──────────────────────────────────────────────
+
+@app.route("/api/history")
+def history_list():
+    """List recent verification sessions."""
+    return jsonify(list_sessions(limit=20))
+
+
+@app.route("/api/history/<session_id>")
+def history_get(session_id):
+    """Get full results for a specific session."""
+    result = get_session(session_id)
+    if result is None:
+        return jsonify({"error": "Session not found"}), 404
+    return jsonify(result)
+
+
+@app.route("/api/history/<session_id>", methods=["DELETE"])
+def history_delete(session_id):
+    """Delete a specific session."""
+    delete_session(session_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/history", methods=["DELETE"])
+def history_clear():
+    """Clear all history."""
+    clear_all_sessions()
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":
