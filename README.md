@@ -1,10 +1,10 @@
 <div align="center">
 
-# 📚 Citation Verifier
+# CiteGuard
 
 ### Automated Academic Citation Verification System
 
-**Cross-reference citations against Crossref, DataCite & OpenAlex — detect fake DOIs, title mismatches, and metadata errors with zero false-positive tolerance.**
+**Cross-reference citations against Crossref, DataCite & OpenAlex — detect fake DOIs, retracted papers, title mismatches, and metadata errors.**
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
@@ -15,38 +15,30 @@
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| 🔗 **Multi-API Cross-Referencing** | Queries Crossref → DataCite → OpenAlex with automatic routing & fallback |
-| 🎯 **Zero False-Positive Architecture** | Conservative 90% threshold — never marks incorrect citations as correct |
-| 🧠 **Multi-Scorer Fuzzy Matching** | Uses `ratio`, `token_sort_ratio`, and `token_set_ratio` from RapidFuzz (C++ backend) |
-| 🔍 **Title-Based Search** | Handles references without DOIs via OpenAlex & Crossref title search |
-| ✅ **Cross-Validation** | OpenAlex independently confirms results from Crossref/DataCite |
-| 🌐 **Web UI** | Beautiful dark-theme interface with side-by-side comparison view |
-| 📋 **Copy Corrected** | One-click copy of all corrected references or individual ones |
-| 📊 **Rich CLI** | Color-coded terminal output with emoji verdicts and summary dashboard |
-| 📄 **JSON Export** | Machine-readable report for CI/CD integration |
-| 🔄 **Resilient Networking** | Exponential backoff retry, rate-limit handling (HTTP 429), connection pooling |
+| **Multi-API Cross-Referencing** | Queries Crossref → DataCite → OpenAlex with automatic routing & fallback |
+| **Retraction Detection** | Flags retracted papers via metadata and title-prefix analysis |
+| **Zero False-Positive Architecture** | Conservative 90% threshold — never marks incorrect citations as correct |
+| **Multi-Scorer Fuzzy Matching** | Uses `ratio`, `token_sort_ratio`, and `token_set_ratio` from RapidFuzz (C++ backend) |
+| **Title-Based Search** | Handles references without DOIs via OpenAlex & Crossref title search |
+| **Cross-Validation** | OpenAlex independently confirms results from Crossref/DataCite |
+| **Persistent Cache** | SQLite-backed DOI cache avoids redundant API calls across sessions |
+| **Verification History** | Browse, reload, and manage past verification sessions |
+| **Live Stats** | Tracks total references verified and usage sessions |
+| **Web UI** | Premium light-theme interface with side-by-side comparison view |
+| **Copy Corrected** | One-click copy of all corrected references or individual ones |
+| **Rich CLI** | Color-coded terminal output with summary dashboard |
+| **JSON Export** | Machine-readable report for CI/CD integration |
+| **Resilient Networking** | Exponential backoff retry, rate-limit handling (HTTP 429), connection pooling |
 
-## 🖥️ Web Interface
-
-<div align="center">
-
-### Side-by-Side Comparison View
-
-Compare your original citations against verified API data — mismatches highlighted in red, corrections in green.
-
-> **Copy individual corrections** with per-card copy buttons, or **copy all corrected references** at once.
-
-</div>
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Citation Verifier                           │
+│                           CiteGuard                                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  ┌──────────┐    ┌──────────────┐    ┌────────────────────────────┐ │
@@ -57,19 +49,26 @@ Compare your original citations against verified API data — mismatches highlig
 │       ▼                                          ▼                  │
 │  ┌──────────┐    ┌──────────────┐    ┌────────────────────────────┐ │
 │  │Normalizer│───▶│  Comparator  │───▶│  Verdict Engine            │ │
-│  │ (Unicode) │    │ (RapidFuzz)  │    │  (≥90% → ✅ VERIFIED)     │ │
+│  │ (Unicode) │    │ (RapidFuzz)  │    │  (≥90% → VERIFIED)        │ │
 │  └──────────┘    └──────────────┘    └────────────────────────────┘ │
 │                                                  │                  │
-│                                          ┌───────┴───────┐         │
-│                                          ▼               ▼         │
-│                                    ┌──────────┐   ┌───────────┐    │
-│                                    │ Rich CLI │   │  Web UI   │    │
-│                                    │ (stdout) │   │  (Flask)  │    │
-│                                    └──────────┘   └───────────┘    │
+│                         ┌────────────────────────┤                  │
+│                         ▼                        ▼                  │
+│                  ┌──────────────┐          ┌───────────┐            │
+│                  │ SQLite Cache │          │ Retraction│            │
+│                  │ + History    │          │ Detector  │            │
+│                  └──────────────┘          └───────────┘            │
+│                         │                        │                  │
+│                  ┌──────┴──────┐                  │                  │
+│                  ▼             ▼                  ▼                  │
+│            ┌──────────┐ ┌───────────┐      ┌───────────┐           │
+│            │ Rich CLI │ │  Web UI   │      │   Stats   │           │
+│            │ (stdout) │ │  (Flask)  │      │  Counter  │           │
+│            └──────────┘ └───────────┘      └───────────┘           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone & Setup
 
@@ -109,43 +108,57 @@ python main.py --file references.txt --json report.json
 python main.py --file references.txt --no-cross-validate
 ```
 
-## 📊 Verdict System
+### 4. Production (PM2)
 
-| Verdict | Icon | Threshold | Meaning |
-|---------|------|-----------|---------|
-| **VERIFIED** | ✅ | ≥ 90% | Citation matches API data with high confidence |
-| **SUSPICIOUS** | ⚠️ | 70-89% | Partial match — manual review recommended |
-| **MISMATCH** | ❌ | < 70% | DOI resolves to a **different paper** |
-| **DEAD DOI** | 💀 | N/A | DOI not found in any API |
-| **TITLE MATCHED** | 📗 | ≥ 90% | No DOI, but title found via search |
-| **NO DOI** | 🔍 | N/A | No DOI and title search inconclusive |
+```bash
+pm2 start ecosystem.config.js
+```
 
-## 📁 Project Structure
+## Verdict System
+
+| Verdict | Threshold | Meaning |
+|---------|-----------|---------|
+| **VERIFIED** | ≥ 90% | Citation matches API data with high confidence |
+| **SUSPICIOUS** | 70–89% | Partial match — manual review recommended |
+| **MISMATCH** | < 70% | DOI resolves to a different paper |
+| **DEAD DOI** | — | DOI not found in any API |
+| **RETRACTED** | — | Paper has been retracted or withdrawn |
+| **TITLE MATCHED** | ≥ 90% | No DOI, but title found via search |
+| **NO DOI** | — | No DOI and title search inconclusive |
+
+## Project Structure
 
 ```
 Citation-Verifier/
-├── citation_verifier/       # Core verification engine
+├── citation_verifier/          # Core verification engine
 │   ├── __init__.py
-│   ├── config.py            # Thresholds, API endpoints, data classes
-│   ├── parser.py            # Reference text parser (DOI, title, year extraction)
-│   ├── normalizer.py        # Unicode & LaTeX normalization pipeline
-│   ├── api_clients.py       # Crossref, DataCite, OpenAlex REST clients
-│   ├── comparator.py        # Multi-scorer fuzzy matching engine
-│   ├── verifier.py          # Core orchestrator
-│   └── reporter.py          # Rich CLI output & JSON generator
+│   ├── config.py               # Thresholds, API endpoints, data classes
+│   ├── parser.py               # Reference text parser (DOI, title, year)
+│   ├── normalizer.py           # Unicode & LaTeX normalization
+│   ├── api_clients.py          # Crossref, DataCite, OpenAlex clients
+│   ├── comparator.py           # Multi-scorer fuzzy matching engine
+│   ├── verifier.py             # Core orchestrator
+│   ├── reporter.py             # Rich CLI output & JSON generator
+│   ├── cache.py                # SQLite persistent DOI cache
+│   ├── history.py              # Verification session history
+│   └── stats.py                # Usage statistics tracker
 ├── templates/
-│   └── index.html           # Web UI template
+│   └── index.html              # Web UI template
 ├── static/
-│   ├── style.css            # Dark theme styles
-│   └── app.js               # Frontend logic
-├── main.py                  # CLI entry point
-├── webapp.py                # Flask web server
-├── requirements.txt         # Python dependencies
-├── test_references.txt      # Sample test data (40 references)
-└── README.md
+│   ├── style.css               # Light theme styles
+│   ├── app.js                  # Frontend logic & inline icon set
+│   ├── favicon.svg             # SVG favicon (pulse-quote motif)
+│   ├── favicon.png             # PNG favicon fallback (32×32)
+│   └── apple-touch-icon.png    # iOS home screen icon (180×180)
+├── data/                       # Runtime databases (gitignored)
+├── main.py                     # CLI entry point
+├── webapp.py                   # Flask web server
+├── ecosystem.config.js         # PM2 production config
+├── requirements.txt            # Python dependencies
+└── test_references.txt         # Sample test data
 ```
 
-## 🔧 Dependencies
+## Dependencies
 
 | Package | Purpose |
 |---------|---------|
@@ -154,7 +167,7 @@ Citation-Verifier/
 | `rich` | Beautiful terminal output |
 | `flask` | Web UI server |
 
-## 🔌 APIs Used
+## APIs Used
 
 | API | Purpose | Rate Limit |
 |-----|---------|------------|
@@ -162,44 +175,9 @@ Citation-Verifier/
 | [DataCite](https://api.datacite.org) | arXiv/preprint DOI resolution | Public |
 | [OpenAlex](https://api.openalex.org) | Cross-validation & title search | Polite pool (with mailto) |
 
-> **Note:** No API keys required. The system uses the polite pools of Crossref and OpenAlex for better performance.
+> No API keys required. The system uses the polite pools of Crossref and OpenAlex for better rate limits.
 
-## 📝 Example Output
-
-```
-══════════════════════════════════════════════════════════════════════
-
-  ✅ Ref [2] — VERIFIED
-     DOI: 10.48550/arXiv.2005.11401
-     Cited Title: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
-     API Title:   Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks (DataCite)
-     Scores: ratio=100.0 | token_sort=100.0 | token_set=100.0 → final=100.0%
-     Year: ✓ (cited=2020, actual=2020)
-     Cross-validated: ✓ Confirmed by OpenAlex
-
-  ❌ Ref [12] — MISMATCH
-     DOI: 10.1109/IRASET57153.2023.10153005
-     Cited Title: AI-based anomaly detection: Challenges and solutions...
-     API Title:   Building Intelligent Chatbots: Tools, Technologies... (Crossref)
-     Scores: ratio=30.2 | token_sort=35.1 | token_set=44.0 → final=44.0%
-     Year: ✓ (cited=2023, actual=2023)
-     ⚠ DOI points to a DIFFERENT paper!
-
-══════════════════════════════════════════════════════════════════════
-
-            📊 Verification Summary
-┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━┓
-┃  Verdict           ┃  Count  ┃  Percentage  ┃
-┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━┩
-│  ✅ VERIFIED       │     27  │       67.5%  │
-│  ⚠️ SUSPICIOUS     │      3  │        7.5%  │
-│  ❌ MISMATCH       │      1  │        2.5%  │
-│  🔍 NO DOI         │      6  │       15.0%  │
-│  📗 TITLE MATCHED  │      3  │        7.5%  │
-└────────────────────┴─────────┴──────────────┘
-```
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -207,7 +185,7 @@ Citation-Verifier/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
@@ -215,8 +193,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-**Built with ❤️ for academic integrity**
-
-*If this tool helped you, consider giving it a ⭐*
+**Built with care for academic integrity — CiteGuard v1.2**
 
 </div>
