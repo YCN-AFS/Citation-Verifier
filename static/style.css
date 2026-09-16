@@ -254,6 +254,20 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);min-hei
 .footer__heart{color:var(--red)}
 .footer__sub{font-size:.62rem;color:var(--text-dim);margin-top:.2rem;opacity:.6}
 
+/* ── CiteGuard Status Icons ──────────────────────────────── */
+.cg-icon{display:inline-block;vertical-align:-.15em;flex-shrink:0;margin-right:.3em}
+.badge .cg-icon{width:14px;height:14px}
+.card__cv .cg-icon{width:12px;height:12px;margin-right:.2em}
+.badge--verified .cg-icon{color:#22c55e}
+.badge--title_matched .cg-icon{color:#047857}
+.badge--suspicious .cg-icon{color:#f59e0b}
+.badge--mismatch .cg-icon{color:#ef4444}
+.badge--dead_doi .cg-icon{color:#ef4444}
+.badge--no_doi .cg-icon{color:#9ca3af}
+.badge--api_error .cg-icon{color:#a78bfa}
+.badge--retracted .cg-icon{color:#fff}
+.card__cv .cg-icon{color:var(--green)}
+
 /* ── Utilities ────────────────────────────────────────────── */
 .hidden{display:none!important}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}

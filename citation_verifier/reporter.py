@@ -32,6 +32,7 @@ _VERDICT_STYLES = {
     Verdict.NO_DOI:        ("🔍", "dim",         "NO DOI"),
     Verdict.API_ERROR:     ("🔌", "bold magenta","API ERROR"),
     Verdict.TITLE_MATCHED: ("📗", "bold cyan",   "TITLE MATCHED"),
+    Verdict.RETRACTED:     ("🚫", "bold red",    "RETRACTED"),
 }
 
 
@@ -178,7 +179,16 @@ def _print_summary(console: Console, results: List[VerificationResult]):
     # Critical alerts
     mismatches = counts.get(Verdict.MISMATCH, 0)
     dead_dois = counts.get(Verdict.DEAD_DOI, 0)
+    retracted = counts.get(Verdict.RETRACTED, 0)
 
+    if retracted > 0:
+        console.print(
+            Panel(
+                f"[bold red]🚫 CRITICAL: {retracted} RETRACTED paper(s) detected!\n"
+                f"These papers have been withdrawn and should NOT be cited.[/bold red]",
+                border_style="red",
+            )
+        )
     if mismatches > 0 or dead_dois > 0:
         console.print(
             Panel(
@@ -188,7 +198,7 @@ def _print_summary(console: Console, results: List[VerificationResult]):
                 border_style="red",
             )
         )
-    elif counts.get(Verdict.SUSPICIOUS, 0) > 0:
+    elif retracted == 0 and counts.get(Verdict.SUSPICIOUS, 0) > 0:
         console.print(
             Panel(
                 f"[bold yellow]📝 {counts[Verdict.SUSPICIOUS]} citation(s) flagged "
@@ -196,7 +206,7 @@ def _print_summary(console: Console, results: List[VerificationResult]):
                 border_style="yellow",
             )
         )
-    else:
+    elif retracted == 0:
         console.print(
             Panel(
                 "[bold green]✅ All citations verified successfully![/bold green]",
@@ -247,7 +257,7 @@ def _build_summary(results: List[VerificationResult]) -> dict:
         "total": len(results),
         "verdicts": counts,
         "has_critical_issues": any(
-            r.verdict in (Verdict.MISMATCH, Verdict.DEAD_DOI) for r in results
+            r.verdict in (Verdict.MISMATCH, Verdict.DEAD_DOI, Verdict.RETRACTED) for r in results
         ),
     }
 

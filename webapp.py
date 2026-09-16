@@ -71,6 +71,10 @@ def verify():
     if not text:
         return jsonify({"error": "Empty reference text."}), 400
 
+    # Limit input size to prevent abuse (max ~100KB or ~200 references)
+    if len(text) > 100_000:
+        return jsonify({"error": "Input too large. Maximum 100,000 characters."}), 400
+
     cross_validate = data.get("cross_validate", True)
 
     try:

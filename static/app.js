@@ -23,14 +23,23 @@ const historyCount = $('historyCount'), editor = $('editor');
 let data = null, view = 'comparison';
 
 const V = {
-    VERIFIED:      { vi:'Xác minh',     css:'verified' },
-    SUSPICIOUS:    { vi:'Nghi ngờ',      css:'suspicious' },
-    MISMATCH:      { vi:'Sai lệch',     css:'mismatch' },
-    DEAD_DOI:      { vi:'DOI không tồn tại', css:'dead_doi' },
-    NO_DOI:        { vi:'Không có DOI',  css:'no_doi' },
-    TITLE_MATCHED: { vi:'Khớp tiêu đề', css:'title_matched' },
-    API_ERROR:     { vi:'Lỗi API',      css:'api_error' },
-    RETRACTED:     { vi:'Đã bị thu hồi', css:'retracted' },
+    VERIFIED:      { vi:'Xác minh',     css:'verified',      icon:'verified' },
+    SUSPICIOUS:    { vi:'Nghi ngờ',      css:'suspicious',    icon:'pending' },
+    MISMATCH:      { vi:'Sai lệch',     css:'mismatch',      icon:'retracted' },
+    DEAD_DOI:      { vi:'DOI không tồn tại', css:'dead_doi', icon:'retracted' },
+    NO_DOI:        { vi:'Không có DOI',  css:'no_doi',        icon:'pending' },
+    TITLE_MATCHED: { vi:'Khớp tiêu đề', css:'title_matched', icon:'verified' },
+    API_ERROR:     { vi:'Lỗi API',      css:'api_error',     icon:'pending' },
+    RETRACTED:     { vi:'Đã bị thu hồi', css:'retracted',    icon:'retracted' },
+};
+
+// CiteGuard custom SVG status icons (pulse-quote motif, 24x24, uses currentColor)
+const STATUS_ICONS = {
+    verified: `<svg class="cg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-5 2 10 2-7h3.5c1.5 0 2.5 1 2.5 2.5S17 15 15.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="18" r="3.2" stroke="currentColor" stroke-width="1.5"/><path d="M17.6 18l1 1 1.9-2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    retracted: `<svg class="cg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M2 12h3l1.5-4 1.5 3 1-6 1.5 9 2-6h3.5c1.5 0 2.5 1 2.5 2.5S17 15 15.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="18" r="3.2" stroke="currentColor" stroke-width="1.5"/><path d="M17.6 16.6l2.8 2.8M20.4 16.6l-2.8 2.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    pending: `<svg class="cg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-5 2 10 2-7h3.5c1.5 0 2.5 1 2.5 2.5S17 15 15.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.4 2.6"/><circle cx="19" cy="18" r="3.2" stroke="currentColor" stroke-width="1.5"/><circle cx="17.7" cy="18" r="0.6" fill="currentColor"/><circle cx="19" cy="18" r="0.6" fill="currentColor"/><circle cx="20.3" cy="18" r="0.6" fill="currentColor"/></svg>`,
+    parsing: `<svg class="cg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="2" width="12" height="15" rx="1.2" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 6.5h6M5.5 9.5h6M5.5 12.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12.5 14.5h2l1-3 1.5 5.5 1-2.5h2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    crossref: `<svg class="cg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="4" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="4" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="4" cy="19" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5h5l3 7-3 7H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M17.6 12l1 1 2-2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
 
 const SORDER = [
@@ -179,11 +188,11 @@ function buildCard(r, i) {
         <div class="card__header">
             <div class="card__left">
                 <span class="card__num">[${num}]</span>
-                <span class="badge badge--${v.css}">${v.vi}</span>
+                <span class="badge badge--${v.css}">${STATUS_ICONS[v.icon] || ''}${v.vi}</span>
             </div>
             <div class="card__right">
                 ${sc !== null ? `<span class="card__score" style="color:${sColor(sc)}">${sc.toFixed(1)}%</span>` : ''}
-                ${r.cross_validated ? '<span class="card__cv">✓ OA</span>' : ''}
+                ${r.cross_validated ? `<span class="card__cv">${STATUS_ICONS.crossref} OA</span>` : ''}
                 <span class="card__chevron">▾</span>
             </div>
         </div>
@@ -344,6 +353,17 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function shake(el) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'shake .4s ease'; setTimeout(() => el.style.animation = '', 500); }
 
 function copyToClipboard(text, msg) {
+    // Prefer modern Clipboard API (requires HTTPS or localhost)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => showToast(msg))
+            .catch(() => copyFallback(text, msg));
+        return;
+    }
+    copyFallback(text, msg);
+}
+
+function copyFallback(text, msg) {
     try {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -356,14 +376,7 @@ function copyToClipboard(text, msg) {
         document.body.removeChild(ta);
         if (ok) { showToast(msg); return; }
     } catch(e) { /* fallback failed */ }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text)
-            .then(() => showToast(msg))
-            .catch(() => showToast('❌ Copy thất bại — thử HTTPS'));
-    } else {
-        showToast('❌ Copy thất bại — trình duyệt không hỗ trợ');
-    }
+    showToast('❌ Copy thất bại — trình duyệt không hỗ trợ');
 }
 
 function showToast(msg) {

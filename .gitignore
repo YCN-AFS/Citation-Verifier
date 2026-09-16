@@ -29,6 +29,10 @@ verification_report.json
 
 # Runtime data
 data/stats.json
+data/stats.json.bak
+data/stats.db
+data/stats.db-wal
+data/stats.db-shm
 data/doi_cache.db
 data/doi_cache.db-wal
 data/doi_cache.db-shm

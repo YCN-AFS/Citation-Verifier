@@ -14,6 +14,7 @@ Supported formats:
 """
 
 import re
+from datetime import datetime
 from typing import List, Optional
 
 from .config import ParsedReference
@@ -356,7 +357,7 @@ def _parse_single_reference(
         bare = _YEAR_BARE.search(text)
         if bare:
             y = int(bare.group(1))
-            if 1900 <= y <= 2030:
+            if 1900 <= y <= datetime.now().year + 2:
                 ref.year = y
 
     # 4. Extract candidate title

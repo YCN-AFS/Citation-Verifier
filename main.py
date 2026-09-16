@@ -103,7 +103,7 @@ Examples:
 
     # ── Exit Code ─────────────────────────────────────────────────────
     has_critical = any(
-        r.verdict in (Verdict.MISMATCH, Verdict.DEAD_DOI)
+        r.verdict in (Verdict.MISMATCH, Verdict.DEAD_DOI, Verdict.RETRACTED)
         for r in results
     )
     sys.exit(1 if has_critical else 0)
