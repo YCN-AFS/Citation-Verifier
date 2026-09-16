@@ -31,10 +31,12 @@
             <a href="/" class="nav__brand">
                 <div class="nav__logo">
                     <svg class="nav__logo-icon" viewBox="0 0 32 32" fill="none">
-                        <rect width="32" height="32" rx="7" fill="#12283f"/>
-                        <path d="M5 17h5l2.5-7 3 13 3-9h4c2 0 3.3 1.3 3.3 3.3S23.5 20 21 20" fill="none" stroke="#e8eef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <circle cx="24.5" cy="23.5" r="4.3" fill="#22c55e"/>
-                        <path d="M22.5 23.6l1.3 1.3 2.6-2.9" fill="none" stroke="#0b1a29" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect width="32" height="32" rx="7" fill="#12283f" />
+                        <path d="M5 17h5l2.5-7 3 13 3-9h4c2 0 3.3 1.3 3.3 3.3S23.5 20 21 20" fill="none"
+                            stroke="#e8eef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <circle cx="24.5" cy="23.5" r="4.3" fill="#22c55e" />
+                        <path d="M22.5 23.6l1.3 1.3 2.6-2.9" fill="none" stroke="#0b1a29" stroke-width="1.6"
+                            stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </div>
                 <div>
@@ -51,8 +53,9 @@
                 <div class="history-wrapper">
                     <button class="history-btn" id="historyBtn" title="Lịch sử xác minh">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
-                            <path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5" />
+                            <path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5"
+                                stroke-linecap="round" />
                         </svg>
                         Lịch sử
                         <span class="badge-count hidden" id="historyCount">0</span>
@@ -78,28 +81,50 @@
                 <span class="hero__title-line">Automated Citation</span>
                 <span class="hero__title-line hero__title-line--accent">Verification System</span>
             </h1>
-            <p class="hero__desc">Xác minh trích dẫn học thuật với độ chính xác tuyệt đối. Hệ thống đối chiếu chéo 3
-                cơ sở dữ liệu — phát hiện DOI giả, sai lệch tiêu đề, và metadata không chính xác.</p>
+            <p class="hero__desc">Đối chiếu chéo trích dẫn học thuật qua 3 cơ sở dữ liệu - phát hiện DOI giả, sai lệch
+                metadata, và bài báo đã bị thu hồi.</p>
 
             <!-- Live Stats Counters -->
             <div class="hero__counters" id="heroCounters">
                 <div class="counter-card">
                     <div class="counter-card__icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="2" width="12" height="15" rx="1.2" stroke="var(--accent)" stroke-width="1.5"/><path d="M5.5 6.5h6M5.5 9.5h6M5.5 12.5h4" stroke="var(--accent)" stroke-width="1.3" stroke-linecap="round"/><path d="M12.5 14.5h2l1-3 1.5 5.5 1-2.5h2.5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                            <rect x="2.5" y="2" width="12" height="15" rx="1.2" stroke="var(--accent)"
+                                stroke-width="1.5" />
+                            <path d="M5.5 6.5h6M5.5 9.5h6M5.5 12.5h4" stroke="var(--accent)" stroke-width="1.3"
+                                stroke-linecap="round" />
+                            <path d="M12.5 14.5h2l1-3 1.5 5.5 1-2.5h2.5" stroke="var(--accent)" stroke-width="1.5"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                     </div>
                     <div class="counter-card__value" id="counterRefs">0</div>
                     <div class="counter-card__label">Tài liệu đã xác minh</div>
                 </div>
                 <div class="counter-card">
                     <div class="counter-card__icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-5 2 10 2-7h3.5c1.5 0 2.5 1 2.5 2.5S17 15 15.5 15" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="18" r="3.2" stroke="var(--accent)" stroke-width="1.5"/><path d="M17.6 18l1 1 1.9-2.1" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                            <path d="M2 12h4l2-5 2 10 2-7h3.5c1.5 0 2.5 1 2.5 2.5S17 15 15.5 15" stroke="var(--accent)"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="19" cy="18" r="3.2" stroke="var(--accent)" stroke-width="1.5" />
+                            <path d="M17.6 18l1 1 1.9-2.1" stroke="var(--accent)" stroke-width="1.5"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                     </div>
                     <div class="counter-card__value" id="counterSessions">0</div>
                     <div class="counter-card__label">Lượt sử dụng</div>
                 </div>
                 <div class="counter-card">
                     <div class="counter-card__icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="4" cy="5" r="2" stroke="var(--accent)" stroke-width="1.5"/><circle cx="4" cy="12" r="2" stroke="var(--accent)" stroke-width="1.5"/><circle cx="4" cy="19" r="2" stroke="var(--accent)" stroke-width="1.5"/><path d="M6 5h5l3 7-3 7H6" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="12" r="3" stroke="var(--accent)" stroke-width="1.5"/><path d="M17.6 12l1 1 2-2.1" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                            <circle cx="4" cy="5" r="2" stroke="var(--accent)" stroke-width="1.5" />
+                            <circle cx="4" cy="12" r="2" stroke="var(--accent)" stroke-width="1.5" />
+                            <circle cx="4" cy="19" r="2" stroke="var(--accent)" stroke-width="1.5" />
+                            <path d="M6 5h5l3 7-3 7H6" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                            <circle cx="19" cy="12" r="3" stroke="var(--accent)" stroke-width="1.5" />
+                            <path d="M17.6 12l1 1 2-2.1" stroke="var(--accent)" stroke-width="1.5"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                     </div>
                     <div class="counter-card__value" id="counterAPIs">3</div>
                     <div class="counter-card__label">API học thuật</div>
@@ -129,7 +154,8 @@
                 </div>
                 <div>
                     <h2 class="panel__title">Nhập Tài Liệu Tham Khảo</h2>
-                    <p class="panel__subtitle">Hỗ trợ APA, IEEE, Vancouver, BibTeX, RIS — hoặc kéo thả file .txt / .bib vào đây</p>
+                    <p class="panel__subtitle">Hỗ trợ APA, IEEE, Vancouver, BibTeX, RIS — hoặc kéo thả file .txt / .bib
+                        vào đây</p>
                 </div>
             </div>
 
@@ -278,7 +304,8 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="footer__inner">
-            <p class="footer__text">Built with <span class="footer__heart">♥</span> for academic integrity — CiteGuard v1.2
+            <p class="footer__text">Built with <span class="footer__heart">♥</span> for academic integrity — CiteGuard
+                v1.2
             </p>
             <p class="footer__sub">Crossref · DataCite · OpenAlex · Retraction Detection · Multi-format Parser</p>
         </div>
