@@ -205,7 +205,21 @@ class CitationVerifier:
 
         result.ground_truth = ground_truth
 
-        # Step 6: Compare title
+        # Step 6: Check retraction status (highest priority)
+        if ground_truth.is_retracted:
+            result.verdict = Verdict.RETRACTED
+            result.error_message = (
+                "This paper has been RETRACTED. "
+                "It should not be cited in academic work."
+            )
+            logger.warning("RETRACTED paper detected: %s", doi)
+            # Still do title comparison for informational purposes
+            if ground_truth.title:
+                comparison = compare(ref, ground_truth)
+                result.comparison = comparison
+            return result
+
+        # Step 7: Compare title
         if ground_truth.title:
             comparison = compare(ref, ground_truth)
             result.comparison = comparison
@@ -215,7 +229,7 @@ class CitationVerifier:
             result.verdict = Verdict.SUSPICIOUS
             result.error_message = "API returned metadata but no title."
 
-        # Step 7: Cross-validate with OpenAlex (if enabled and primary wasn't OpenAlex)
+        # Step 8: Cross-validate with OpenAlex (if enabled and primary wasn't OpenAlex)
         if self.cross_validate and ground_truth.api_source != "OpenAlex":
             result = self._cross_validate_with_openalex(ref, result)
 
@@ -301,9 +315,25 @@ class CitationVerifier:
         if not ref.doi:
             return result
 
-        oa_truth = self.openalex.fetch_by_doi(ref.doi)
+        try:
+            oa_truth = self.openalex.fetch_by_doi(ref.doi)
+        except Exception as e:
+            logger.warning("Cross-validation skipped (OpenAlex error): %s", e)
+            return result
+
         if oa_truth is None or not oa_truth.title:
             # OpenAlex doesn't have this DOI — can't cross-validate
+            return result
+
+        # Propagate retraction status from OpenAlex
+        if oa_truth.is_retracted and not result.ground_truth.is_retracted:
+            result.ground_truth.is_retracted = True
+            result.verdict = Verdict.RETRACTED
+            result.error_message = (
+                "This paper has been RETRACTED. "
+                "It should not be cited in academic work."
+            )
+            logger.warning("RETRACTED detected via OpenAlex cross-validation: %s", ref.doi)
             return result
 
         # Compare OpenAlex title vs primary API title

@@ -222,7 +222,7 @@ def save_json_report(
         "metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "total_references": len(results),
-            "system_version": "1.0.0",
+            "system_version": "1.2.0",
         },
         "summary": _build_summary(results),
         "results": [_serialize_result(r) for r in results],

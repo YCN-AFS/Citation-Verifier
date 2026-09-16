@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiteGuard — Xác Minh Trích Dẫn Học Thuật Tự Động</title>
     <meta name="description"
-        content="CiteGuard — Hệ thống xác minh trích dẫn học thuật tự động. Đối chiếu chéo Crossref, DataCite, OpenAlex để phát hiện DOI giả và sai lệch metadata.">
+        content="CiteGuard v1.2 — Hệ thống xác minh trích dẫn học thuật tự động. Phát hiện bài báo bị thu hồi, DOI giả, sai lệch metadata. Hỗ trợ APA, IEEE, BibTeX, RIS. Đối chiếu chéo Crossref, DataCite, OpenAlex.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -39,7 +39,7 @@
                 </div>
                 <div>
                     <span class="nav__title">CiteGuard</span>
-                    <span class="nav__version">v1.0</span>
+                    <span class="nav__version">v1.2</span>
                 </div>
             </a>
             <div class="nav__right">
@@ -108,9 +108,10 @@
 
             <!-- Feature tags -->
             <div class="hero__features">
-                <span class="hero__feature-tag">Zero False-Positive</span>
-                <span class="hero__feature-tag">Ngưỡng xác minh 90%</span>
+                <span class="hero__feature-tag">Retraction Detection</span>
+                <span class="hero__feature-tag">Multi-format Parser</span>
                 <span class="hero__feature-tag">Cross-validation tự động</span>
+                <span class="hero__feature-tag">Zero False-Positive</span>
             </div>
         </div>
     </header>
@@ -128,8 +129,7 @@
                 </div>
                 <div>
                     <h2 class="panel__title">Nhập Tài Liệu Tham Khảo</h2>
-                    <p class="panel__subtitle">Dán danh sách trích dẫn — hệ thống tự động trích xuất DOI, tiêu đề, tác
-                        giả và đối chiếu chéo</p>
+                    <p class="panel__subtitle">Hỗ trợ APA, IEEE, Vancouver, BibTeX, RIS — hoặc kéo thả file .txt / .bib vào đây</p>
                 </div>
             </div>
 
@@ -152,7 +152,7 @@
                     </div>
                 </div>
                 <textarea id="refInput" class="editor__textarea"
-                    placeholder="[1]. Lewis, P., Perez, E., ... (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. https://doi.org/10.48550/arXiv.2005.11401&#10;[2]. Vaswani, A., Shazeer, N., ... (2017). Attention is all you need. ..."
+                    placeholder="Dán danh sách tài liệu tham khảo vào đây (hỗ trợ mọi format)&#10;&#10;APA:  Vaswani, A., et al. (2017). Attention is all you need. https://doi.org/10.48550/arXiv.1706.03762&#10;IEEE: [1]. Lewis, P. (2020). Retrieval-Augmented Generation... https://doi.org/10.48550/arXiv.2005.11401&#10;BibTeX: @article{vaswani2017, title={Attention Is All You Need}, doi={10.48550/arXiv.1706.03762}}"
                     spellcheck="false"></textarea>
             </div>
 
@@ -286,9 +286,9 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="footer__inner">
-            <p class="footer__text">Built with <span class="footer__heart">♥</span> for academic integrity — CiteGuard
+            <p class="footer__text">Built with <span class="footer__heart">♥</span> for academic integrity — CiteGuard v1.2
             </p>
-            <p class="footer__sub">Crossref · DataCite · OpenAlex · RapidFuzz · Zero False-Positive Architecture</p>
+            <p class="footer__sub">Crossref · DataCite · OpenAlex · Retraction Detection · Multi-format Parser</p>
         </div>
     </footer>
 

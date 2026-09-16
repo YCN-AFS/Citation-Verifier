@@ -87,6 +87,7 @@ def set_cached(doi: str, ground_truth: GroundTruth):
             "year": ground_truth.year,
             "source_journal": ground_truth.source_journal,
             "api_source": ground_truth.api_source,
+            "is_retracted": ground_truth.is_retracted,
         }
         conn.execute(
             "INSERT OR REPLACE INTO doi_cache (doi, ground_truth, api_source, cached_at) "

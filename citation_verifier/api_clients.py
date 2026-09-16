@@ -134,6 +134,7 @@ class CrossrefClient:
                 year=self._extract_year(data),
                 source_journal=self._extract_journal(data),
                 api_source="Crossref",
+                is_retracted=self._check_retracted(data),
             )
 
         except requests.exceptions.RequestException as e:
@@ -212,6 +213,36 @@ class CrossrefClient:
     def _extract_journal(data: dict) -> Optional[str]:
         names = data.get("container-title", [])
         return names[0] if names else None
+
+    @staticmethod
+    def _check_retracted(data: dict) -> bool:
+        """
+        Check if a Crossref work has been retracted.
+
+        Uses three detection methods:
+        1. 'update-to' field with type 'retraction' or 'withdrawal'
+        2. 'relation' field containing retraction references
+        3. Title prefix: publishers often prepend 'RETRACTED:' to the title
+        """
+        # Method 1: update-to field
+        for update in data.get("update-to", []):
+            update_type = update.get("type", "").lower()
+            if update_type in ("retraction", "withdrawal"):
+                return True
+
+        # Method 2: relation field (used by some publishers)
+        for rel_type, rels in data.get("relation", {}).items():
+            if "retract" in rel_type.lower():
+                return True
+
+        # Method 3: title prefix (Lancet, Springer, Elsevier convention)
+        titles = data.get("title", [])
+        if titles:
+            title_lower = titles[0].lower()
+            if title_lower.startswith(("retracted:", "retracted ", "withdrawn:")):
+                return True
+
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -420,6 +451,7 @@ class OpenAlexClient:
             year=data.get("publication_year"),
             source_journal=source,
             api_source="OpenAlex",
+            is_retracted=bool(data.get("is_retracted", False)),
         )
 
 

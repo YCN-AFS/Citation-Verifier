@@ -30,10 +30,12 @@ const V = {
     NO_DOI:        { vi:'Không có DOI',  css:'no_doi' },
     TITLE_MATCHED: { vi:'Khớp tiêu đề', css:'title_matched' },
     API_ERROR:     { vi:'Lỗi API',      css:'api_error' },
+    RETRACTED:     { vi:'Đã bị thu hồi', css:'retracted' },
 };
 
 const SORDER = [
     {k:'total',   l:'Tổng cộng',   c:'s-total'},
+    {k:'RETRACTED',l:'Thu hồi',    c:'s-retracted'},
     {k:'VERIFIED',l:'Xác minh',    c:'s-verified'},
     {k:'SUSPICIOUS',l:'Nghi ngờ',  c:'s-suspicious'},
     {k:'MISMATCH',l:'Sai lệch',   c:'s-mismatch'},
@@ -189,7 +191,7 @@ function buildCard(r, i) {
             ${body}
             ${buildCardCopyBar(r, i)}
             ${buildScores(r)}
-            ${r.error ? `<div class="card__error">${esc(r.error)}</div>` : ''}
+            ${r.error && r.verdict === 'RETRACTED' ? `<div class="card__error--retracted">${esc(r.error)}</div>` : r.error ? `<div class="card__error">${esc(r.error)}</div>` : ''}
         </div>
     </div>`;
 }
@@ -427,6 +429,7 @@ function renderHistory(sessions) {
 
     const items = sessions.map(s => {
         const sumParts = [];
+        if (s.summary.RETRACTED) sumParts.push(`${s.summary.RETRACTED} retracted`);
         if (s.summary.VERIFIED) sumParts.push(`${s.summary.VERIFIED} verified`);
         if (s.summary.SUSPICIOUS) sumParts.push(`${s.summary.SUSPICIOUS} suspicious`);
         if (s.summary.MISMATCH) sumParts.push(`${s.summary.MISMATCH} mismatch`);

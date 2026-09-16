@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "citeguard",
       script: "/home/hoi/Citation-Verifier/.venv/bin/gunicorn",
-      args: "--bind 0.0.0.0:5000 --workers 2 --timeout 120 webapp:app",
+      args: "--bind 0.0.0.0:5000 --workers 2 --timeout 180 --graceful-timeout 30 webapp:app",
       cwd: "/home/hoi/Citation-Verifier",
       interpreter: "none",
       env: {

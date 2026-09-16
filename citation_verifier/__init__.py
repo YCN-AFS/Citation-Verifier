@@ -14,5 +14,5 @@ Architecture:
     reporter.py     → Rich CLI output and JSON report generation
 """
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 __author__ = "Citation Verifier Team"

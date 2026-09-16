@@ -49,7 +49,7 @@ def health():
     from citation_verifier.cache import get_cache_stats
     return jsonify({
         "status": "healthy",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "cache": get_cache_stats(),
         "stats": get_stats(),
     })
@@ -121,6 +121,7 @@ def _serialize_results(results: list) -> dict:
                 "source_journal": r.ground_truth.source_journal,
                 "doi": r.ground_truth.doi,
                 "api_source": r.ground_truth.api_source,
+                "is_retracted": r.ground_truth.is_retracted,
             }
 
         if r.comparison:
@@ -143,7 +144,7 @@ def _serialize_results(results: list) -> dict:
         "total": len(results),
         "summary": counts,
         "has_critical": any(
-            r.verdict in (Verdict.MISMATCH, Verdict.DEAD_DOI)
+            r.verdict in (Verdict.MISMATCH, Verdict.DEAD_DOI, Verdict.RETRACTED)
             for r in results
         ),
         "results": serialized,

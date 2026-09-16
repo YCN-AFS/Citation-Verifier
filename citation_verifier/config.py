@@ -24,6 +24,7 @@ class Verdict(Enum):
     NO_DOI = "NO_DOI"               # No DOI found in the reference
     API_ERROR = "API_ERROR"         # All API attempts failed
     TITLE_MATCHED = "TITLE_MATCHED" # No DOI, but title search found a match
+    RETRACTED = "RETRACTED"         # Paper has been retracted
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -61,11 +62,11 @@ DATACITE_DOI_PREFIXES = ("10.48550",)  # arXiv
 # Network Resilience
 # ─────────────────────────────────────────────────────────────────────
 
-REQUEST_TIMEOUT = 15            # Seconds per HTTP request
-MAX_RETRIES = 3                 # Number of retry attempts
-RETRY_BACKOFF_FACTOR = 1.0      # Exponential backoff: 1s, 2s, 4s
-RATE_LIMIT_DELAY = 0.35         # Seconds between API calls (per API)
-RATE_LIMIT_429_WAIT = 5.0       # Seconds to wait on HTTP 429
+REQUEST_TIMEOUT = 10            # Seconds per HTTP request
+MAX_RETRIES = 2                 # Number of retry attempts
+RETRY_BACKOFF_FACTOR = 0.5      # Exponential backoff: 0.5s, 1s
+RATE_LIMIT_DELAY = 0.25         # Seconds between API calls (per API)
+RATE_LIMIT_429_WAIT = 3.0       # Seconds to wait on HTTP 429
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ RATE_LIMIT_429_WAIT = 5.0       # Seconds to wait on HTTP 429
 # ─────────────────────────────────────────────────────────────────────
 
 USER_AGENT = (
-    f"CitationVerifier/1.0.0 "
+    f"CitationVerifier/1.2.0 "
     f"(https://github.com/citation-verifier; mailto:{CROSSREF_MAILTO})"
 )
 
@@ -102,6 +103,7 @@ class GroundTruth:
     year: Optional[int] = None
     source_journal: Optional[str] = None
     api_source: str = ""  # "Crossref", "DataCite", "OpenAlex"
+    is_retracted: bool = False  # True if the paper has been retracted
 
 
 @dataclass
