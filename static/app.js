@@ -15,7 +15,7 @@ const cardsContainer = $('cardsContainer');
 const viewComp = $('viewComp'), viewList = $('viewList');
 const copyOriginalBtn = $('copyOriginalBtn'), copyCorrectedBtn = $('copyCorrectedBtn');
 const exportJsonBtn = $('exportJsonBtn'), diffBanner = $('diffBanner');
-const diffCount = $('diffCount'), diffCopyBtn = $('diffCopyBtn');
+const diffCount = $('diffCount');
 const toast = $('toast'), toastMsg = $('toastMsg');
 const historyBtn = $('historyBtn'), historyDropdown = $('historyDropdown');
 const historyCount = $('historyCount'), editor = $('editor');
@@ -89,7 +89,7 @@ viewComp.addEventListener('click', () => setView('comparison'));
 viewList.addEventListener('click', () => setView('list'));
 copyOriginalBtn.addEventListener('click', () => copyOriginal());
 copyCorrectedBtn.addEventListener('click', () => copyCorrected());
-diffCopyBtn.addEventListener('click', () => copyCorrected());
+
 exportJsonBtn.addEventListener('click', () => exportJSON());
 
 // ─── Verify ──────────────────────────────────────────────────
