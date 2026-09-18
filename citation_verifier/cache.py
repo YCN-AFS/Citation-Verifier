@@ -113,3 +113,38 @@ def get_cache_stats() -> dict:
         return {"total_entries": total, "valid_entries": valid}
     except Exception:
         return {"total_entries": 0, "valid_entries": 0}
+
+
+def cleanup_expired() -> dict:
+    """
+    Purge expired cache entries and checkpoint WAL file.
+
+    Should be called periodically (e.g., via /api/cache/cleanup)
+    to keep the database compact.
+
+    Returns:
+        Dict with cleanup statistics.
+    """
+    try:
+        conn = _get_conn()
+        # Count expired entries before deletion
+        expired = conn.execute(
+            "SELECT COUNT(*) FROM doi_cache WHERE (? - cached_at) > ?",
+            (time.time(), _TTL)
+        ).fetchone()[0]
+
+        # Delete expired entries
+        conn.execute(
+            "DELETE FROM doi_cache WHERE (? - cached_at) > ?",
+            (time.time(), _TTL)
+        )
+
+        # Checkpoint WAL to reduce file size
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.commit()
+
+        logger.info("Cache cleanup: removed %d expired entries", expired)
+        return {"expired_removed": expired, "status": "ok"}
+    except Exception as e:
+        logger.error("Cache cleanup error: %s", e)
+        return {"expired_removed": 0, "status": f"error: {e}"}

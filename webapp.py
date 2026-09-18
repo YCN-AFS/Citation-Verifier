@@ -12,6 +12,9 @@ import logging
 from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from citation_verifier.config import Verdict, VerificationResult
 from citation_verifier.history import (
@@ -26,12 +29,33 @@ from citation_verifier.verifier import CitationVerifier
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
+# ─── Security: CORS ──────────────────────────────────────────
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["https://citeguard.giize.com", "http://localhost:5000"],
+        "methods": ["GET", "POST", "DELETE"],
+        "max_age": 3600,
+    }
+})
+
+# ─── Security: Rate Limiting ─────────────────────────────────
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["60 per minute"],
+    storage_uri="memory://",
+)
+
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# Maximum number of references per request
+MAX_REFERENCES = 200
+
 
 @app.route("/")
+@limiter.exempt
 def index():
     """Serve the main web interface."""
     return render_template("index.html")
@@ -56,6 +80,7 @@ def health():
 
 
 @app.route("/api/verify", methods=["POST"])
+@limiter.limit("10 per minute")
 def verify():
     """
     API endpoint for citation verification.
@@ -71,9 +96,22 @@ def verify():
     if not text:
         return jsonify({"error": "Empty reference text."}), 400
 
+    # Validate encoding — reject non-UTF-8 content
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return jsonify({"error": "Invalid text encoding. UTF-8 required."}), 400
+
     # Limit input size to prevent abuse (max ~100KB or ~200 references)
     if len(text) > 100_000:
         return jsonify({"error": "Input too large. Maximum 100,000 characters."}), 400
+
+    # Estimate reference count (rough: one per non-empty line or DOI)
+    line_count = len([l for l in text.split("\n") if l.strip()])
+    if line_count > MAX_REFERENCES:
+        return jsonify({
+            "error": f"Too many references (~{line_count}). Maximum {MAX_REFERENCES}."
+        }), 400
 
     cross_validate = data.get("cross_validate", True)
 
@@ -184,6 +222,24 @@ def history_clear():
     """Clear all history."""
     clear_all_sessions()
     return jsonify({"ok": True})
+
+
+# ─── Maintenance API ─────────────────────────────────────────
+
+@app.route("/api/cache/cleanup", methods=["POST"])
+@limiter.limit("2 per hour")
+def cache_cleanup():
+    """Purge expired cache entries and old history sessions."""
+    from citation_verifier.cache import cleanup_expired
+    from citation_verifier.history import cleanup_old_sessions
+
+    cache_result = cleanup_expired()
+    history_result = cleanup_old_sessions()
+
+    return jsonify({
+        "cache": cache_result,
+        "history": history_result,
+    })
 
 
 if __name__ == "__main__":

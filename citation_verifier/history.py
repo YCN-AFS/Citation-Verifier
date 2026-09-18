@@ -130,3 +130,42 @@ def clear_all_sessions():
         conn.commit()
     except Exception as e:
         logger.error("Failed to clear sessions: %s", e)
+
+
+def cleanup_old_sessions(max_age_days: int = 90) -> dict:
+    """
+    Remove sessions older than max_age_days.
+
+    Should be called periodically to prevent unbounded database growth.
+
+    Args:
+        max_age_days: Maximum age in days (default 90).
+
+    Returns:
+        Dict with cleanup statistics.
+    """
+    try:
+        conn = _get_conn()
+        cutoff = time.time() - (max_age_days * 86400)
+
+        # Count old sessions
+        old_count = conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE created_at < ?",
+            (cutoff,),
+        ).fetchone()[0]
+
+        # Delete old sessions
+        conn.execute(
+            "DELETE FROM sessions WHERE created_at < ?",
+            (cutoff,),
+        )
+
+        # Checkpoint WAL
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.commit()
+
+        logger.info("History cleanup: removed %d old sessions (>%d days)", old_count, max_age_days)
+        return {"removed": old_count, "max_age_days": max_age_days, "status": "ok"}
+    except Exception as e:
+        logger.error("History cleanup error: %s", e)
+        return {"removed": 0, "status": f"error: {e}"}

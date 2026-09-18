@@ -70,11 +70,20 @@ RATE_LIMIT_429_WAIT = 3.0       # Seconds to wait on HTTP 429
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Input Limits
+# ─────────────────────────────────────────────────────────────────────
+
+MAX_REFERENCES = 200            # Maximum references per verification request
+
+
+# ─────────────────────────────────────────────────────────────────────
 # User-Agent
 # ─────────────────────────────────────────────────────────────────────
 
+from . import __version__
+
 USER_AGENT = (
-    f"CitationVerifier/1.2.0 "
+    f"CitationVerifier/{__version__} "
     f"(https://github.com/citation-verifier; mailto:{CROSSREF_MAILTO})"
 )
 
