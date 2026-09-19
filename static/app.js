@@ -574,3 +574,45 @@ editor.addEventListener('drop', (e) => {
     };
     reader.readAsText(file, 'utf-8');
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Dark Mode Toggle
+// ═══════════════════════════════════════════════════════════════
+
+(function initTheme() {
+    const toggle = $('themeToggle');
+    if (!toggle) return;
+
+    // Determine initial theme: saved preference > system preference > light
+    const saved = localStorage.getItem('citeguard-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    toggle.addEventListener('click', () => {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const newTheme = isDark ? 'light' : 'dark';
+
+        if (newTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+
+        localStorage.setItem('citeguard-theme', newTheme);
+    });
+
+    // Listen for system preference changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('citeguard-theme')) {
+            if (e.matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        }
+    });
+})();

@@ -117,10 +117,10 @@ def get_cache_stats() -> dict:
 
 def cleanup_expired() -> dict:
     """
-    Purge expired cache entries and checkpoint WAL file.
+    Purge expired cache entries.
 
-    Should be called periodically (e.g., via /api/cache/cleanup)
-    to keep the database compact.
+    Runs within the existing thread-local connection to avoid
+    cross-process WAL lock conflicts with Gunicorn workers.
 
     Returns:
         Dict with cleanup statistics.
@@ -138,9 +138,6 @@ def cleanup_expired() -> dict:
             "DELETE FROM doi_cache WHERE (? - cached_at) > ?",
             (time.time(), _TTL)
         )
-
-        # Checkpoint WAL to reduce file size
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         conn.commit()
 
         logger.info("Cache cleanup: removed %d expired entries", expired)
@@ -148,3 +145,4 @@ def cleanup_expired() -> dict:
     except Exception as e:
         logger.error("Cache cleanup error: %s", e)
         return {"expired_removed": 0, "status": f"error: {e}"}
+

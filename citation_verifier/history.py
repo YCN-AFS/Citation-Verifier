@@ -136,7 +136,8 @@ def cleanup_old_sessions(max_age_days: int = 90) -> dict:
     """
     Remove sessions older than max_age_days.
 
-    Should be called periodically to prevent unbounded database growth.
+    Runs within the existing thread-local connection to avoid
+    cross-process WAL lock conflicts with Gunicorn workers.
 
     Args:
         max_age_days: Maximum age in days (default 90).
@@ -159,9 +160,6 @@ def cleanup_old_sessions(max_age_days: int = 90) -> dict:
             "DELETE FROM sessions WHERE created_at < ?",
             (cutoff,),
         )
-
-        # Checkpoint WAL
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         conn.commit()
 
         logger.info("History cleanup: removed %d old sessions (>%d days)", old_count, max_age_days)
