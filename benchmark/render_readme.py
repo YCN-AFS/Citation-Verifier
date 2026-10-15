@@ -30,6 +30,11 @@ def render_block(data):
         f"retracted papers and invented references. **{ok}/{cases} = {100 * ok / cases:.1f}%** received the expected verdict, "
         f"with {fa} wrong acceptances and {fr} wrong rejections. "
         f"Measured {data['measured_on']} on code version `{data['code_version']}`.", "",
+        "```mermaid", "xychart-beta", '    title "Share of cases with the expected verdict (%)"',
+        "    x-axis [" + ", ".join(f'"{x["short_en"] if "short_en" in x else x["id"]}"' for x in data["sets"]) + "]",
+        '    y-axis "Percent" 80 --> 100',
+        "    bar [" + ", ".join(f"{100 * sum(c['correct'] for c in x['classes']) / sum(c['total'] for c in x['classes']):.1f}" for x in data["sets"]) + "]",
+        "```", "",
         "| Set | Cases | Expected verdict | Wrong acceptances | Wrong rejections |",
         "|---|---:|---:|---:|---:|",
     ]

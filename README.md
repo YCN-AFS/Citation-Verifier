@@ -1,88 +1,130 @@
-# CiteGuard
+<h1 align="center">CiteGuard</h1>
 
-Automated verification of academic citations. CiteGuard checks each reference against Crossref, DataCite and OpenAlex and reports fabricated DOIs, retracted papers, title mismatches and other metadata errors.
+<p align="center">
+  Check every reference in a paper against Crossref, DataCite and OpenAlex.<br>
+  Catch fabricated DOIs, retracted papers and citations that point to the wrong work.
+</p>
 
-[![CI](https://github.com/YCN-AFS/Citation-Verifier/actions/workflows/python-app.yml/badge.svg)](https://github.com/YCN-AFS/Citation-Verifier/actions)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center">
+  <a href="https://github.com/YCN-AFS/Citation-Verifier/actions"><img alt="CI" src="https://github.com/YCN-AFS/Citation-Verifier/actions/workflows/python-app.yml/badge.svg"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
 
-## Contents
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#benchmark">Benchmark</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#http-api">HTTP API</a>
+</p>
 
-- [Features](#features)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [Verdicts](#verdicts)
-- [Benchmark](#benchmark)
-- [How it works](#how-it-works)
-- [HTTP API](#http-api)
-- [Project structure](#project-structure)
-- [Contributing](#contributing)
+<p align="center">
+  <img src="docs/screenshots/results.png" alt="CiteGuard web UI showing six verified references with their verdicts" width="880"><br>
+  <sub>The web UI (Vietnamese interface) after checking six references.</sub>
+</p>
 
-## Features
+## What you get
 
-- **Multi-source lookup.** DOIs are routed to Crossref or DataCite, with OpenAlex as an independent cross-check.
-- **Retraction detection.** Retracted papers are flagged from source metadata and from title prefixes such as "RETRACTED:".
-- **References without a DOI.** Title search through OpenAlex and Crossref; a title-only match is accepted only when the first author and a consistent year also match.
-- **Fuzzy title comparison.** RapidFuzz `ratio`, `token_sort_ratio` and `token_set_ratio`, with Unicode and LaTeX normalization.
-- **Honest failure handling.** If a source is unreachable the result is `API_ERROR`, never a false `DEAD_DOI` or `NO_DOI`.
-- **Web UI, CLI and JSON export.** The web UI verifies in the background with live progress, keeps a per-browser history and shows a side-by-side comparison with copy-able corrected references.
-- **Caching and rate limiting.** SQLite cache for DOI and title lookups, a process-wide request throttle, retries with exponential backoff.
+Paste a reference list in almost any format (APA, IEEE, Vancouver, BibTeX, RIS) and every entry gets one of these verdicts:
+
+| Verdict | Meaning | In the screenshot |
+|---|---|---|
+| `VERIFIED` | The DOI resolves and the title matches the registered record. | [1] |
+| `MISMATCH` | The DOI is real but belongs to a different paper. | [2] |
+| `DEAD_DOI` | The DOI does not exist in any source. | [3] |
+| `RETRACTED` | The paper has been retracted or withdrawn. | [4] |
+| `TITLE_MATCHED` | No DOI given, but the title was found and the first author and year are consistent. | [5] |
+| `NO_DOI` | No DOI, and no confirmed match by title search. | [6] |
+| `SUSPICIOUS` | Partial match (70–89%); worth a manual look. | |
+| `API_ERROR` | A source was unreachable or rate-limited, so no verdict is given. Retry later. | |
+
+Beyond verdicts:
+
+- **Side-by-side comparison** of what you cited against what the source says, with one-click copy of corrected references.
+- **Cross-check against a second source.** OpenAlex independently confirms Crossref and DataCite results.
+- **Background jobs with live progress**, per-browser history, and JSON export for CI.
+- **Honest failures.** An unreachable source produces `API_ERROR`, never a false `DEAD_DOI` or `NO_DOI`, and failed lookups are never cached.
 
 ## Quick start
 
 ```bash
 git clone https://github.com/YCN-AFS/Citation-Verifier.git
 cd Citation-Verifier
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Web interface:
+**Web interface**
 
 ```bash
-python webapp.py               # http://localhost:5000
+python webapp.py        # then open http://localhost:5000
 ```
 
-Command line:
+**Command line**
 
 ```bash
 python main.py --file references.txt
 python main.py --text "[1]. Author (2020). Title. https://doi.org/10.xxxx"
 python main.py --file references.txt --json report.json     # machine-readable report
-python main.py --file references.txt --no-cross-validate    # faster, skips OpenAlex check
+python main.py --file references.txt --no-cross-validate    # faster, skips the OpenAlex check
+```
+
+Example output (abridged):
+
+```text
+Ref [1] - VERIFIED
+   DOI: 10.1016/j.susc.2014.06.021
+   Cited Title: Oxygen and iodine adsorption on cesium-precovered Pt(111). Surface Science
+   API Title:   Oxygen and iodine adsorption on cesium-precovered Pt(111) (Crossref)
+   Year: ok (cited=2014, actual=2014)
+   Cross-validated: confirmed by OpenAlex
+
+Ref [2] - MISMATCH
+   DOI: 10.1186/s40663-018-0142-2
+   Cited Title: Weakly extendable partial clones on an infinite set. Forest Ecosystems
+   API Title:   Young and old forest in the boreal: critical stages of ecosystem dynamics ... (Crossref)
+   Scores: ratio=38.6 | token_sort=45.5 | token_set=50.0 -> final=55.0%
+
+Ref [4] - RETRACTED
+   DOI: 10.1016/0014-5793(92)81355-p
+   Note: This paper has been RETRACTED. It should not be cited in academic work.
 ```
 
 Production deployment uses PM2: `pm2 start ecosystem.config.js`.
 
-## Configuration
+## How it works
 
-Settings are read from environment variables. The application does not load `.env` by itself; export the variables or set them in the `env` block of `ecosystem.config.js`.
+```mermaid
+flowchart LR
+    A[Reference text] --> B[Parse and normalize]
+    B --> C{DOI present?}
+    C -- yes --> D[Crossref or DataCite lookup]
+    D --> E[Fuzzy title comparison]
+    E --> F[OpenAlex cross-check and retraction check]
+    C -- no --> G[OpenAlex and Crossref title search]
+    G --> H[Strict title, first author and year check]
+    F --> I[Verdict]
+    H --> I
+```
 
-| Variable | Purpose |
-|---|---|
-| `OPENALEX_API_KEY` | Free OpenAlex API key, sent as a Bearer header. Strongly recommended: without it, all requests from one IP share a small daily budget (roughly 100 title searches) and then fail with HTTP 429. |
-| `CITEGUARD_MAILTO` | Contact address sent to Crossref and OpenAlex for their polite pools. Default: `citeguard@giize.com`; set your own for your deployment. |
-
-Crossref and DataCite need no key.
-
-## Verdicts
-
-| Verdict | Meaning |
-|---|---|
-| `VERIFIED` | The DOI resolves and the title matches (score ≥ 90%). |
-| `SUSPICIOUS` | Partial match (70–89%); manual review recommended. |
-| `MISMATCH` | The DOI resolves to a different paper (score < 70%). |
-| `DEAD_DOI` | The DOI was not found in any source. |
-| `RETRACTED` | The paper has been retracted or withdrawn. |
-| `TITLE_MATCHED` | No DOI, but the title was found by search and the first author is listed and the year is consistent. |
-| `NO_DOI` | No DOI, and title search found no confirmed match. |
-| `API_ERROR` | A source was unreachable or rate-limited, so no verdict could be given. Retry later. |
+- Titles are compared with RapidFuzz (`ratio`, `token_sort_ratio`, `token_set_ratio`) after Unicode and LaTeX normalization; 90% or more is a match.
+- A reference without a DOI is accepted only when the title matches strictly **and** the first author and year are consistent with the record.
+- Lookups are cached in SQLite and requests share one process-wide throttle, with retries and exponential backoff.
 
 <!-- BENCHMARK:START (generated by benchmark/render_readme.py) -->
 ## Benchmark
 
 CiteGuard was run against 539 labeled references (509 distinct references) built from real Crossref records, mixing correct citations with fabricated DOIs, mismatched titles, retracted papers and invented references. **536/539 = 99.4%** received the expected verdict, with 0 wrong acceptances and 0 wrong rejections. Measured 2026-10-15 on code version `c66613e`.
+
+```mermaid
+xychart-beta
+    title "Share of cases with the expected verdict (%)"
+    x-axis ["original", "fresh", "hard"]
+    y-axis "Percent" 80 --> 100
+    bar [100.0, 100.0, 97.5]
+```
 
 | Set | Cases | Expected verdict | Wrong acceptances | Wrong rejections |
 |---|---:|---:|---:|---:|
@@ -151,20 +193,16 @@ python benchmark/render_readme.py    # regenerate this section
 The full write-up, including the bugs the benchmark uncovered, is in [`benchmark/RESULTS.md`](benchmark/RESULTS.md). The web UI shows the same numbers, served from `benchmark/summary.json` at `/api/benchmark`.
 <!-- BENCHMARK:END -->
 
-## How it works
+## Configuration
 
-```
-reference text
-   │  parser        extract DOI, title, authors, year
-   │  normalizer    Unicode / LaTeX clean-up
-   ▼
-with DOI ──► Crossref / DataCite ──► title comparison ──► OpenAlex cross-check
-no DOI   ──► OpenAlex + Crossref title search ──► strict title + first author + year check
-   ▼
-verdict (+ retraction check) ──► CLI report / web UI / JSON
-```
+Settings are read from environment variables. The application does not load `.env` by itself; export the variables or set them in the `env` block of `ecosystem.config.js`.
 
-Lookups are cached in SQLite. Failed lookups are never cached, so a temporary outage cannot turn into a stored wrong answer.
+| Variable | Purpose |
+|---|---|
+| `OPENALEX_API_KEY` | Free OpenAlex API key, sent as a Bearer header. Strongly recommended: without it, all requests from one IP share a small daily budget (roughly 100 title searches) and then fail with HTTP 429. |
+| `CITEGUARD_MAILTO` | Contact address sent to Crossref and OpenAlex for their polite pools. Default: `citeguard@giize.com`; set your own for your deployment. |
+
+Crossref and DataCite need no key.
 
 ## HTTP API
 
