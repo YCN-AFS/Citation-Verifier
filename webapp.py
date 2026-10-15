@@ -16,6 +16,7 @@ from flask import Flask, g, jsonify, render_template, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from citation_verifier import __version__
 from citation_verifier.config import MAX_REFERENCES, Verdict
@@ -30,6 +31,10 @@ from citation_verifier.stats import get_stats, increment_stats
 from citation_verifier.verifier import CitationVerifier
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# Behind Nginx Proxy Manager (the only host that can reach the bind address):
+# trust exactly one proxy hop so rate limiting sees the real client IP.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # ─── Security: CORS ──────────────────────────────────────────
 CORS(app, resources={
