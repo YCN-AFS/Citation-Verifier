@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 from .api_clients import (
+    ApiUnavailable,
     CrossrefClient,
     DataCiteClient,
     OpenAlexClient,
@@ -170,34 +171,55 @@ class CitationVerifier:
             logger.info("Cache HIT for DOI: %s (%s)", doi, cached.api_source)
 
         # Step 1: Try primary API
+        # api_failures collects transient errors (timeouts, 5xx, ...). A DOI
+        # may only be declared DEAD when every API answered definitively.
+        api_failures = []
+
+        def _lookup(client):
+            try:
+                return client.fetch_by_doi(doi)
+            except ApiUnavailable as e:
+                api_failures.append(str(e))
+                return None
+
         if ground_truth is None:
             primary = route_doi_to_api(doi)
             if primary == "Crossref":
-                ground_truth = self.crossref.fetch_by_doi(doi)
+                ground_truth = _lookup(self.crossref)
                 fallback_client = self.datacite
                 fallback_name = "DataCite"
             else:
-                ground_truth = self.datacite.fetch_by_doi(doi)
+                ground_truth = _lookup(self.datacite)
                 fallback_client = self.crossref
                 fallback_name = "Crossref"
 
             # Step 2: If primary fails, try fallback
             if ground_truth is None:
                 logger.info("Primary API (%s) returned nothing. Trying %s...", primary, fallback_name)
-                ground_truth = fallback_client.fetch_by_doi(doi)
+                ground_truth = _lookup(fallback_client)
 
             # Step 3: If both fail, try OpenAlex
             if ground_truth is None:
                 logger.info("Crossref + DataCite failed. Trying OpenAlex...")
-                ground_truth = self.openalex.fetch_by_doi(doi)
+                ground_truth = _lookup(self.openalex)
 
             # Step 4: Cache successful result
             if ground_truth is not None:
                 set_cached(doi, ground_truth)
 
         # Step 5: Evaluate result
+        if ground_truth is None and api_failures:
+            # No definitive answer — never claim the DOI is fake.
+            result.verdict = Verdict.API_ERROR
+            result.error_message = (
+                f"Could not verify DOI '{doi}': API unavailable "
+                f"({'; '.join(api_failures)}). Please retry."
+            )
+            logger.warning("API_ERROR for DOI %s: %s", doi, api_failures)
+            return result
+
         if ground_truth is None:
-            # DOI exists in none of the APIs → DEAD_DOI
+            # Every API answered 404 → DEAD_DOI
             result.verdict = Verdict.DEAD_DOI
             result.error_message = f"DOI '{doi}' not found in any API."
             logger.warning("DEAD DOI: %s", doi)

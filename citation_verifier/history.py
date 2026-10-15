@@ -37,6 +37,12 @@ def _get_conn() -> sqlite3.Connection:
                 results_json TEXT NOT NULL
             )
         """)
+        # Migration: scope sessions to an owner (anonymous browser id).
+        # Legacy rows get owner='' and are never served to anyone.
+        cols = [r[1] for r in _local.conn.execute("PRAGMA table_info(sessions)")]
+        if "owner" not in cols:
+            _local.conn.execute("ALTER TABLE sessions ADD COLUMN owner TEXT NOT NULL DEFAULT ''")
+        _local.conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_owner ON sessions(owner, created_at)")
         _local.conn.commit()
     return _local.conn
 
@@ -47,6 +53,7 @@ def save_session(
     has_critical: bool,
     input_text: str,
     results_data: dict,
+    owner: str,
 ) -> str:
     """Save a verification session and return its ID."""
     try:
@@ -54,7 +61,7 @@ def save_session(
         session_id = uuid.uuid4().hex[:8]
         preview = input_text[:300].replace("\n", " ").strip()
         conn.execute(
-            "INSERT INTO sessions VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO sessions (id, created_at, total_refs, summary_json, has_critical, input_preview, results_json, owner) VALUES (?,?,?,?,?,?,?,?)",
             (
                 session_id,
                 time.time(),
@@ -63,6 +70,7 @@ def save_session(
                 int(has_critical),
                 preview,
                 json.dumps(results_data, ensure_ascii=False),
+                owner,
             ),
         )
         conn.commit()
@@ -73,14 +81,14 @@ def save_session(
         return ""
 
 
-def list_sessions(limit: int = 20) -> list:
-    """List recent verification sessions (without full results)."""
+def list_sessions(owner: str, limit: int = 20) -> list:
+    """List the owner's recent verification sessions (without full results)."""
     try:
         conn = _get_conn()
         rows = conn.execute(
             "SELECT id, created_at, total_refs, summary_json, has_critical, input_preview "
-            "FROM sessions ORDER BY created_at DESC LIMIT ?",
-            (limit,),
+            "FROM sessions WHERE owner = ? ORDER BY created_at DESC LIMIT ?",
+            (owner, limit),
         ).fetchall()
         return [
             {
@@ -97,13 +105,13 @@ def list_sessions(limit: int = 20) -> list:
         return []
 
 
-def get_session(session_id: str) -> Optional[dict]:
-    """Retrieve full session results by ID."""
+def get_session(session_id: str, owner: str) -> Optional[dict]:
+    """Retrieve full session results by ID (owner only)."""
     try:
         conn = _get_conn()
         row = conn.execute(
-            "SELECT results_json FROM sessions WHERE id = ?",
-            (session_id,),
+            "SELECT results_json FROM sessions WHERE id = ? AND owner = ?",
+            (session_id, owner),
         ).fetchone()
         if row is None:
             return None
@@ -112,21 +120,21 @@ def get_session(session_id: str) -> Optional[dict]:
         return None
 
 
-def delete_session(session_id: str):
-    """Delete a session by ID."""
+def delete_session(session_id: str, owner: str):
+    """Delete one of the owner's sessions by ID."""
     try:
         conn = _get_conn()
-        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.execute("DELETE FROM sessions WHERE id = ? AND owner = ?", (session_id, owner))
         conn.commit()
     except Exception as e:
         logger.error("Failed to delete session %s: %s", session_id, e)
 
 
-def clear_all_sessions():
-    """Delete all sessions."""
+def clear_all_sessions(owner: str):
+    """Delete all of the owner's sessions."""
     try:
         conn = _get_conn()
-        conn.execute("DELETE FROM sessions")
+        conn.execute("DELETE FROM sessions WHERE owner = ?", (owner,))
         conn.commit()
     except Exception as e:
         logger.error("Failed to clear sessions: %s", e)

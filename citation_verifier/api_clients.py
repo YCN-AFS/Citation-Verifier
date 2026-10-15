@@ -33,6 +33,14 @@ from .config import (
 logger = logging.getLogger(__name__)
 
 
+class ApiUnavailable(Exception):
+    """Raised when an API could not give a definitive answer
+    (network error, timeout, 5xx, persistent 429).
+
+    Distinct from a 404, which is a definitive "DOI does not exist".
+    """
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Shared Session Factory
 # ─────────────────────────────────────────────────────────────────────
@@ -106,7 +114,8 @@ class CrossrefClient:
             doi: A DOI string (e.g., "10.1145/3397271.3401075").
 
         Returns:
-            GroundTruth object with extracted metadata, or None on failure.
+            GroundTruth object, or None if the DOI does not exist (404).
+            Raises ApiUnavailable on network/server errors.
         """
         url = f"{self.base_url}/{doi}"
         params = {"mailto": CROSSREF_MAILTO}
@@ -139,7 +148,7 @@ class CrossrefClient:
 
         except requests.exceptions.RequestException as e:
             logger.error("Crossref API error for DOI %s: %s", doi, e)
-            return None
+            raise ApiUnavailable(f"Crossref: {e}") from e
 
     def search_by_title(self, title: str, rows: int = 3) -> Optional[GroundTruth]:
         """
@@ -276,7 +285,8 @@ class DataCiteClient:
             doi: A DOI string (e.g., "10.48550/arXiv.2005.11401").
 
         Returns:
-            GroundTruth object, or None on failure.
+            GroundTruth object, or None if the DOI does not exist (404).
+            Raises ApiUnavailable on network/server errors.
         """
         url = f"{self.base_url}/{doi}"
         self._rate_limit()
@@ -307,7 +317,7 @@ class DataCiteClient:
 
         except requests.exceptions.RequestException as e:
             logger.error("DataCite API error for DOI %s: %s", doi, e)
-            return None
+            raise ApiUnavailable(f"DataCite: {e}") from e
 
     @staticmethod
     def _extract_title(data: dict) -> Optional[str]:
@@ -371,7 +381,8 @@ class OpenAlexClient:
             doi: A DOI string.
 
         Returns:
-            GroundTruth object, or None on failure.
+            GroundTruth object, or None if the DOI does not exist (404).
+            Raises ApiUnavailable on network/server errors.
         """
         url = f"{self.base_url}/doi:{doi}"
         params = {"mailto": OPENALEX_MAILTO}
@@ -390,7 +401,7 @@ class OpenAlexClient:
 
         except requests.exceptions.RequestException as e:
             logger.error("OpenAlex DOI lookup error for %s: %s", doi, e)
-            return None
+            raise ApiUnavailable(f"OpenAlex: {e}") from e
 
     def search_by_title(self, title: str, per_page: int = 3) -> Optional[GroundTruth]:
         """

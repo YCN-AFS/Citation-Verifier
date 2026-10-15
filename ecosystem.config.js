@@ -9,7 +9,7 @@ module.exports = {
       env: {
         PYTHONUNBUFFERED: "1",
       },
-      max_memory_restart: "200M",
+      max_memory_restart: "500M",
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
     },
   ],

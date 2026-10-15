@@ -7,16 +7,18 @@ Provides a visual, interactive UI with side-by-side comparison of
 cited text vs ground truth.
 """
 
-import json
 import logging
+import re
+import secrets
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from citation_verifier.config import Verdict, VerificationResult
+from citation_verifier import __version__
+from citation_verifier.config import MAX_REFERENCES, Verdict
 from citation_verifier.history import (
     clear_all_sessions,
     delete_session,
@@ -50,8 +52,29 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# Maximum number of references per request
-MAX_REFERENCES = 200
+# ─── Anonymous per-browser identity (scopes verification history) ───
+_SID_COOKIE = "cg_sid"
+_SID_RE = re.compile(r"^[0-9a-f]{32}$")
+_SID_MAX_AGE = 365 * 86400
+
+
+def _owner() -> str:
+    """Return this browser's anonymous id, minting one if absent/invalid."""
+    sid = request.cookies.get(_SID_COOKIE, "")
+    if _SID_RE.match(sid):
+        return sid
+    if "new_sid" not in g:
+        g.new_sid = secrets.token_hex(16)
+    return g.new_sid
+
+
+@app.after_request
+def _set_sid_cookie(resp):
+    sid = g.get("new_sid")
+    if sid:
+        resp.set_cookie(_SID_COOKIE, sid, max_age=_SID_MAX_AGE,
+                        httponly=True, samesite="Lax")
+    return resp
 
 
 @app.route("/")
@@ -73,7 +96,7 @@ def health():
     from citation_verifier.cache import get_cache_stats
     return jsonify({
         "status": "healthy",
-        "version": "1.2.0",
+        "version": __version__,
         "cache": get_cache_stats(),
         "stats": get_stats(),
     })
@@ -127,6 +150,7 @@ def verify():
             has_critical=response["has_critical"],
             input_text=text,
             results_data=response,
+            owner=_owner(),
         )
         return jsonify(response)
     except Exception as e:
@@ -198,13 +222,13 @@ def _serialize_results(results: list) -> dict:
 @app.route("/api/history")
 def history_list():
     """List recent verification sessions."""
-    return jsonify(list_sessions(limit=20))
+    return jsonify(list_sessions(_owner(), limit=20))
 
 
 @app.route("/api/history/<session_id>")
 def history_get(session_id):
     """Get full results for a specific session."""
-    result = get_session(session_id)
+    result = get_session(session_id, _owner())
     if result is None:
         return jsonify({"error": "Session not found"}), 404
     return jsonify(result)
@@ -213,14 +237,14 @@ def history_get(session_id):
 @app.route("/api/history/<session_id>", methods=["DELETE"])
 def history_delete(session_id):
     """Delete a specific session."""
-    delete_session(session_id)
+    delete_session(session_id, _owner())
     return jsonify({"ok": True})
 
 
 @app.route("/api/history", methods=["DELETE"])
 def history_clear():
     """Clear all history."""
-    clear_all_sessions()
+    clear_all_sessions(_owner())
     return jsonify({"ok": True})
 
 
@@ -243,4 +267,4 @@ def cache_cleanup():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=False, host="127.0.0.1", port=5000)
