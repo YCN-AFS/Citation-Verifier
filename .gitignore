@@ -42,3 +42,6 @@ data/history.db-shm
 
 # Gemini
 .gemini/
+data/jobs.db
+data/jobs.db-wal
+data/jobs.db-shm

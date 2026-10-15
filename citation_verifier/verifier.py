@@ -107,7 +107,15 @@ class CitationVerifier:
         if total <= 3:
             out = []
             for i, ref in enumerate(references, 1):
-                out.append(self._verify_single(ref))
+                try:
+                    out.append(self._verify_single(ref))
+                except Exception as e:  # one bad reference must not fail the batch
+                    logger.error("Verification failed for ref %d: %s", i, e, exc_info=True)
+                    out.append(VerificationResult(
+                        reference=ref,
+                        verdict=Verdict.API_ERROR,
+                        error_message=f"Verification error: {str(e)}",
+                    ))
                 _report(i)
             return out
 

@@ -6,8 +6,24 @@ fuzzy matching, eliminating superficial differences that would
 produce false mismatches.
 """
 
+import html
 import re
 import unicodedata
+
+
+def strip_markup(text: str) -> str:
+    """
+    Remove publisher markup (<i>, <sub>, <scp>, JATS/MathML tags, entities).
+
+    Tags are removed without inserting spaces so that chemical formulae and
+    subscripts collapse the way people type them: ``YBa<sub>2</sub>Cu<sub>3</sub>``
+    becomes ``YBa2Cu3``.
+    """
+    if not text:
+        return ""
+    text = html.unescape(text)
+    text = re.sub(r"</?[A-Za-z][^<>]*>", "", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize_title(title: str) -> str:
@@ -40,8 +56,8 @@ def normalize_title(title: str) -> str:
     # 2. Lowercase
     text = text.lower()
 
-    # 3. Strip HTML tags (e.g., <i>, <sub>, <sup>)
-    text = re.sub(r"<[^>]+>", " ", text)
+    # 3. Strip HTML/JATS tags and entities (e.g., <i>, <sub>, <scp>, &amp;)
+    text = strip_markup(text)
 
     # 4. Strip LaTeX commands but keep content inside braces
     #    e.g., \textbf{BERT} → BERT, \emph{attention} → attention

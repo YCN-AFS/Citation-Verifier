@@ -25,10 +25,13 @@ from .config import ParsedReference
 # ─────────────────────────────────────────────────────────────────────
 
 # DOI pattern — captures standard DOIs including complex suffixes
-# NOTE: Allows parentheses within DOIs (e.g., 10.1016/S0167-9236(02)00114-8)
+# NOTE: Allows parentheses, brackets and semicolons within DOIs, e.g.
+#   10.1016/S0167-9236(02)00114-8
+#   10.1675/1524-4695(2007)030[0573:DCSAOB]2.0.CO;2   (SICI-style, BioOne/Wiley)
+# Unbalanced trailing closers and punctuation are removed by _clean_doi().
 _DOI_PATTERN = re.compile(
     r"(?:https?://(?:dx\.)?doi\.org/)?"     # Optional DOI URL prefix
-    r"(10\.\d{4,9}/[^\s,;\]\"\'']+)",       # Core DOI (allows parens)
+    r"(10\.\d{4,9}/[^\s,\"\'']+)",           # Core DOI
     re.IGNORECASE
 )
 
@@ -383,20 +386,19 @@ def _clean_doi(doi: str) -> str:
     Returns:
         Cleaned DOI string.
     """
-    # Strip common trailing punctuation (but not parens yet)
-    doi = doi.rstrip(".,;:'\"]}\\'")
-
-    # Handle parentheses: strip trailing ')' only if unbalanced
-    while doi.endswith(")"):
-        open_count = doi.count("(")
-        close_count = doi.count(")")
-        if close_count > open_count:
+    pairs = {")": "(", "]": "[", "}": "{"}
+    while doi:
+        # Trailing punctuation is never part of a DOI
+        stripped = doi.rstrip(".,;:'\"\\")
+        if stripped != doi:
+            doi = stripped
+            continue
+        # Closing bracket: keep only if it balances an opener in the DOI
+        last = doi[-1]
+        if last in pairs and doi.count(last) > doi.count(pairs[last]):
             doi = doi[:-1]
-        else:
-            break  # Balanced — keep the closing paren
-
-    # Final cleanup of any trailing periods after paren handling
-    doi = doi.rstrip(".")
+            continue
+        break
 
     return doi
 

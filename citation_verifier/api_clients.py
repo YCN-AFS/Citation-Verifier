@@ -15,6 +15,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from .normalizer import strip_markup
 from .config import (
     CROSSREF_API_BASE,
     CROSSREF_MAILTO,
@@ -80,8 +81,9 @@ def _create_session() -> requests.Session:
 
     Retry policy:
         - 3 attempts with exponential backoff (1s, 2s, 4s)
-        - Retries on 429 (rate limit), 500, 502, 503, 504
-        - Respects Retry-After header on 429 responses
+        - Retries on 500, 502, 503, 504 with backoff capped at 5s
+        - 429 is NOT retried here: each client waits a bounded time once,
+          then reports ApiUnavailable (never sleeps on a server-chosen delay)
 
     Returns:
         Configured requests.Session instance.
@@ -95,9 +97,10 @@ def _create_session() -> requests.Session:
     retry_strategy = Retry(
         total=MAX_RETRIES,
         backoff_factor=RETRY_BACKOFF_FACTOR,
-        status_forcelist=[429, 500, 502, 503, 504],
+        status_forcelist=[500, 502, 503, 504],  # 429 is handled by the clients (bounded wait)
         allowed_methods=["GET"],
-        respect_retry_after_header=True,
+        respect_retry_after_header=False,  # a huge Retry-After would block a worker for hours
+        backoff_max=5,
     )
 
     adapter = HTTPAdapter(
@@ -187,7 +190,7 @@ class CrossrefClient:
             Best-matching GroundTruth, or None.
         """
         params = {
-            "query.bibliographic": title,
+            "query.bibliographic": strip_markup(title),
             "rows": rows,
             "mailto": CROSSREF_MAILTO,
         }
@@ -219,7 +222,7 @@ class CrossrefClient:
     @staticmethod
     def _extract_title(data: dict) -> Optional[str]:
         titles = data.get("title", [])
-        return titles[0] if titles else None
+        return strip_markup(titles[0]) if titles else None
 
     @staticmethod
     def _extract_authors(data: dict) -> list:
@@ -235,11 +238,12 @@ class CrossrefClient:
     def _extract_year(data: dict) -> Optional[int]:
         # Try published-print, then published-online, then issued
         for key in ("published-print", "published-online", "issued"):
-            date_parts = data.get(key, {}).get("date-parts", [[]])
+            date_parts = (data.get(key) or {}).get("date-parts") or [[]]
             if date_parts and date_parts[0]:
                 try:
+                    # Crossref sometimes sends [[null]] for undated records
                     return int(date_parts[0][0])
-                except (ValueError, IndexError):
+                except (ValueError, TypeError, IndexError):
                     continue
         return None
 
@@ -345,7 +349,8 @@ class DataCiteClient:
     def _extract_title(data: dict) -> Optional[str]:
         titles = data.get("titles", [])
         if titles:
-            return titles[0].get("title")
+            t = titles[0].get("title")
+            return strip_markup(t) if t else None
         return None
 
     @staticmethod
@@ -436,7 +441,7 @@ class OpenAlexClient:
             Best-matching GroundTruth, or None.
         """
         params = {
-            "search": title,
+            "search": strip_markup(title),
             "per_page": per_page,
             "mailto": OPENALEX_MAILTO,
         }
