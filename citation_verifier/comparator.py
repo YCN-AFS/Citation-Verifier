@@ -21,7 +21,7 @@ from .config import (
     THRESHOLD_VERIFIED,
     Verdict,
 )
-from .normalizer import extract_surnames, normalize_title
+from .normalizer import extract_surnames, normalize_author_name, normalize_title
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +192,113 @@ def _compare_authors(
         return None
 
     return len(matched) / total
+
+
+# Title-only matching (no DOI) has no identifier to anchor on, so a similar
+# title alone is not proof. These bounds keep the zero false-accept bias.
+TITLE_ONLY_MIN_SCORE = 85          # overall similarity needed at all
+TITLE_ONLY_MIN_STRICT_SCORE = 80   # ratio / token_sort (not inflated by subsets)
+TITLE_ONLY_MIN_SCORE_NO_AUTHORS = 95         # when the citation lists no authors
+TITLE_ONLY_MIN_STRICT_SCORE_NO_AUTHORS = 90  # ...also for the strict scorers
+TITLE_ONLY_MAX_YEAR_GAP = 1        # preprint vs. published year
+TITLE_ONLY_MAX_YEAR_GAP_AUTHORS = 3  # online-first vs. print year, if authors agree
+TITLE_ONLY_MIN_WORDS_SUBSET = 4    # shorter title must have this many words to
+                                   # be trusted as a truncated/subtitle-less citation
+
+
+def authors_overlap(
+    reference: ParsedReference,
+    ground_truth: GroundTruth,
+) -> Optional[bool]:
+    """
+    Does any ground-truth author surname appear in the cited author text?
+
+    Robust to initials and formats ("Hobbs, N. T.", "N. Thompson Hobbs",
+    "Hobbs NT") because it only checks whole-word surname presence.
+
+    Returns:
+        True/False, or None if either side has no author information.
+    """
+    if not reference.authors_raw or not ground_truth.authors:
+        return None
+    gt_surnames = {s for s in extract_surnames(ground_truth.authors) if len(s) >= 2}
+    if not gt_surnames:
+        return None
+    cited_words = set(normalize_author_name(reference.authors_raw).split())
+    return bool(gt_surnames & cited_words)
+
+
+def confirm_title_only_match(
+    reference: ParsedReference,
+    ground_truth: GroundTruth,
+    comparison: ComparisonResult,
+) -> tuple:
+    """
+    Decide whether a DOI-less title search result is really the cited paper.
+
+    A match is confirmed only if ALL hold:
+        1. overall score ≥ TITLE_ONLY_MIN_SCORE
+        2. max(ratio, token_sort) ≥ TITLE_ONLY_MIN_STRICT_SCORE — token_set
+           alone is inflated whenever one title's words are a subset of the
+           other's (e.g. "Hierarchical Bayesian Models")
+        3. at least one author surname agrees; if the citation lists no
+           authors, the title must be near-exact (score ≥ 95, strict ≥ 90)
+        4. years (when both known) differ by at most TITLE_ONLY_MAX_YEAR_GAP
+           (a wider gap is tolerated when authors agree: online-first vs print)
+
+    Rule 2 is waived for a title that merely contains / is contained in the
+    other (dropped subtitle) if authors AND year also agree.
+
+    Returns:
+        (confirmed: bool, reason: str) — reason explains a rejection.
+    """
+    score = comparison.final_score
+    if score < TITLE_ONLY_MIN_SCORE:
+        return False, f"match score ({score:.1f}%) is too low for confirmation"
+
+    strict = max(comparison.ratio_score, comparison.token_sort_score)
+    overlap = authors_overlap(reference, ground_truth)
+    year_gap = (
+        abs(reference.year - ground_truth.year)
+        if reference.year and ground_truth.year else None
+    )
+
+    if strict < TITLE_ONLY_MIN_STRICT_SCORE:
+        # One title containing the other is legitimate when a citation drops
+        # the subtitle — but only with independent agreement on authors AND
+        # year, and a title long enough not to be a generic phrase.
+        min_words = min(
+            len(normalize_title(_get_best_cited_title(reference) or "").split()),
+            len(normalize_title(ground_truth.title or "").split()),
+        )
+        subtitle_ok = (
+            overlap is True
+            and year_gap is not None and year_gap <= TITLE_ONLY_MAX_YEAR_GAP
+            and comparison.token_set_score >= TITLE_ONLY_MIN_SCORE_NO_AUTHORS
+            and min_words >= TITLE_ONLY_MIN_WORDS_SUBSET
+        )
+        if not subtitle_ok:
+            return False, (
+                f"titles only share a subset of words (strict similarity {strict:.1f}%)"
+            )
+    if overlap is False:
+        return False, "a similar title exists but none of the cited authors match"
+    if overlap is None and (
+        score < TITLE_ONLY_MIN_SCORE_NO_AUTHORS
+        or strict < TITLE_ONLY_MIN_STRICT_SCORE_NO_AUTHORS
+    ):
+        return False, (
+            f"no authors to confirm the match; title similarity "
+            f"{score:.1f}% (strict {strict:.1f}%) is not near-exact"
+        )
+
+    max_gap = TITLE_ONLY_MAX_YEAR_GAP_AUTHORS if overlap is True else TITLE_ONLY_MAX_YEAR_GAP
+    if year_gap is not None and year_gap > max_gap:
+        return False, (
+            f"year differs (cited {reference.year}, found {ground_truth.year})"
+        )
+
+    return True, ""
 
 
 def _get_best_cited_title(reference: ParsedReference) -> Optional[str]:

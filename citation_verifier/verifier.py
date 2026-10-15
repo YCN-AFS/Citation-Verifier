@@ -26,7 +26,7 @@ from .api_clients import (
     route_doi_to_api,
 )
 from .cache import get_cached, is_known_missing, set_cached, set_missing
-from .comparator import compare
+from .comparator import compare, confirm_title_only_match
 from .config import (
     GroundTruth,
     ParsedReference,
@@ -340,14 +340,16 @@ class CitationVerifier:
             comparison = compare(ref, ground_truth)
             result.comparison = comparison
 
-            # For title-based search, use stricter threshold
-            if comparison.final_score >= 85:
+            # A similar title alone is not proof: also require author/year
+            # agreement and a score not inflated by word-subset matching.
+            confirmed, reason = confirm_title_only_match(ref, ground_truth, comparison)
+            if confirmed:
                 result.verdict = Verdict.TITLE_MATCHED
             else:
                 result.verdict = Verdict.NO_DOI
                 result.error_message = (
-                    f"Title search found a result but match score "
-                    f"({comparison.final_score:.1f}%) is too low for confirmation."
+                    f"Title search found a candidate but it could not be "
+                    f"confirmed: {reason}."
                 )
         else:
             result.verdict = Verdict.NO_DOI
