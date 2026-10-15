@@ -25,7 +25,14 @@ from .api_clients import (
     OpenAlexClient,
     route_doi_to_api,
 )
-from .cache import get_cached, is_known_missing, set_cached, set_missing
+from .cache import (
+    get_cached,
+    get_title_candidates,
+    is_known_missing,
+    set_cached,
+    set_missing,
+    set_title_candidates,
+)
 from .comparator import compare, confirm_title_only_match
 from .config import (
     GroundTruth,
@@ -326,8 +333,18 @@ class CitationVerifier:
         # every candidate is checked and the first one that can be CONFIRMED
         # (title + author + year evidence) wins.
         best = None            # (score, ground_truth, comparison, reason) of the best rejected
-        for client in (self.openalex, self.crossref):
-            for candidate in client.search_candidates(title):
+        api_failures = []
+        norm_title = normalize_title(title)
+        for name, client in (("OpenAlex", self.openalex), ("Crossref", self.crossref)):
+            candidates = get_title_candidates(name, norm_title)
+            if candidates is None:
+                try:
+                    candidates = client.search_candidates(title)
+                except ApiUnavailable as e:
+                    api_failures.append(str(e))
+                    continue
+                set_title_candidates(name, norm_title, candidates)
+            for candidate in candidates:
                 if not candidate.title:
                     continue
                 comparison = compare(ref, candidate)
@@ -339,6 +356,17 @@ class CitationVerifier:
                     return result
                 if best is None or comparison.final_score > best[0]:
                     best = (comparison.final_score, candidate, comparison, reason)
+
+        if api_failures:
+            # A source we could not reach might hold the cited paper, so
+            # "no match" would be a guess. Report that the check failed.
+            result.verdict = Verdict.API_ERROR
+            result.error_message = (
+                f"Title search could not be completed ({'; '.join(api_failures)}). "
+                f"Please retry."
+            )
+            logger.warning("API_ERROR for title search '%s': %s", title[:60], api_failures)
+            return result
 
         result.verdict = Verdict.NO_DOI
         if best is None:

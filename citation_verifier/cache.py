@@ -10,6 +10,7 @@ Default TTL: 7 days — academic metadata rarely changes.
 
 import json
 import logging
+from dataclasses import asdict
 import sqlite3
 import threading
 import time
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 _DB_PATH = Path(__file__).parent.parent / "data" / "doi_cache.db"
 _TTL = 7 * 86400  # 7 days in seconds
 _MISSING_TTL = 3600  # DOIs every API answered 404 for: re-check after 1 hour
+_TITLE_TTL = 86400  # title-search results: 1 day
 _local = threading.local()
 
 
@@ -46,8 +48,52 @@ def _get_conn() -> sqlite3.Connection:
                 cached_at REAL NOT NULL
             )
         """)
+        _local.conn.execute("""
+            CREATE TABLE IF NOT EXISTS title_cache (
+                key TEXT PRIMARY KEY,
+                candidates TEXT NOT NULL,
+                cached_at REAL NOT NULL
+            )
+        """)
         _local.conn.commit()
     return _local.conn
+
+
+def _title_key(source: str, normalized_title: str) -> str:
+    return f"{source}|{normalized_title}"
+
+
+def get_title_candidates(source: str, normalized_title: str) -> Optional[list]:
+    """Cached title-search candidates for one API, or None if absent/expired.
+
+    An empty list is a valid cached answer ("searched, found nothing").
+    """
+    try:
+        row = _get_conn().execute(
+            "SELECT candidates, cached_at FROM title_cache WHERE key = ?",
+            (_title_key(source, normalized_title),),
+        ).fetchone()
+        if row is None or (time.time() - row[1]) > _TITLE_TTL:
+            return None
+        return [GroundTruth(**d) for d in json.loads(row[0])]
+    except Exception as e:
+        logger.warning("Title-cache read error: %s", e)
+        return None
+
+
+def set_title_candidates(source: str, normalized_title: str, candidates: list):
+    """Cache a SUCCESSFUL title search (never call this after an API error)."""
+    try:
+        conn = _get_conn()
+        conn.execute(
+            "INSERT OR REPLACE INTO title_cache (key, candidates, cached_at) VALUES (?, ?, ?)",
+            (_title_key(source, normalized_title),
+             json.dumps([asdict(c) for c in candidates], ensure_ascii=False),
+             time.time()),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.warning("Title-cache write error: %s", e)
 
 
 def is_known_missing(doi: str) -> bool:
@@ -173,6 +219,10 @@ def cleanup_expired() -> dict:
         conn.execute(
             "DELETE FROM doi_missing WHERE (? - cached_at) > ?",
             (time.time(), _MISSING_TTL),
+        )
+        conn.execute(
+            "DELETE FROM title_cache WHERE (? - cached_at) > ?",
+            (time.time(), _TITLE_TTL),
         )
         conn.commit()
 

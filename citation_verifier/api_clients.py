@@ -179,8 +179,11 @@ class CrossrefClient:
             raise ApiUnavailable(f"Crossref: {e}") from e
 
     def search_by_title(self, title: str, rows: int = 3) -> Optional[GroundTruth]:
-        """Best (first) Crossref title-search result, or None."""
-        candidates = self.search_candidates(title, rows)
+        """Best (first) Crossref title-search result, or None (also on API errors)."""
+        try:
+            candidates = self.search_candidates(title, rows)
+        except ApiUnavailable:
+            return None
         return candidates[0] if candidates else None
 
     def search_candidates(self, title: str, rows: int = 3) -> List[GroundTruth]:
@@ -192,7 +195,8 @@ class CrossrefClient:
             rows: Number of results to retrieve (default 3).
 
         Returns:
-            Candidate GroundTruths in relevance order (empty if none/error).
+            Candidate GroundTruths in relevance order (empty if none).
+            Raises ApiUnavailable on network/server errors.
         """
         params = {
             "query.bibliographic": strip_markup(title),
@@ -221,7 +225,7 @@ class CrossrefClient:
 
         except requests.exceptions.RequestException as e:
             logger.error("Crossref search error: %s", e)
-            return []
+            raise ApiUnavailable(f"Crossref: {e}") from e
 
     @staticmethod
     def _extract_title(data: dict) -> Optional[str]:
@@ -432,8 +436,11 @@ class OpenAlexClient:
             raise ApiUnavailable(f"OpenAlex: {e}") from e
 
     def search_by_title(self, title: str, per_page: int = 3) -> Optional[GroundTruth]:
-        """Best (first) OpenAlex title-search result, or None."""
-        candidates = self.search_candidates(title, per_page)
+        """Best (first) OpenAlex title-search result, or None (also on API errors)."""
+        try:
+            candidates = self.search_candidates(title, per_page)
+        except ApiUnavailable:
+            return None
         return candidates[0] if candidates else None
 
     def search_candidates(self, title: str, per_page: int = 3) -> List[GroundTruth]:
@@ -447,7 +454,8 @@ class OpenAlexClient:
             per_page: Number of results (default 3).
 
         Returns:
-            Candidate GroundTruths in relevance order (empty if none/error).
+            Candidate GroundTruths in relevance order (empty if none).
+            Raises ApiUnavailable on network/server errors.
         """
         params = {
             "search": strip_markup(title),
@@ -465,7 +473,7 @@ class OpenAlexClient:
 
         except requests.exceptions.RequestException as e:
             logger.error("OpenAlex search error: %s", e)
-            return []
+            raise ApiUnavailable(f"OpenAlex: {e}") from e
 
     def _parse_work(self, data: dict) -> GroundTruth:
         """Parse an OpenAlex work object into a GroundTruth."""
