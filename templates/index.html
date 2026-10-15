@@ -144,7 +144,7 @@
                 <span class="hero__feature-tag">Retraction Detection</span>
                 <span class="hero__feature-tag">Multi-format Parser</span>
                 <span class="hero__feature-tag">Cross-validation tự động</span>
-                <span class="hero__feature-tag">Zero False-Positive</span>
+                <span class="hero__feature-tag" id="heroBenchTag">Conservative Matching</span>
             </div>
         </div>
     </header>
@@ -297,6 +297,30 @@
 
             <!-- Cards -->
             <div class="cards" id="cardsContainer"></div>
+        </section>
+
+        <!-- Benchmark (measured accuracy) -->
+        <section class="panel bench hidden" id="benchSection">
+            <div class="panel__header">
+                <div class="panel__icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M4 16V9M10 16V4M16 16v-5" stroke="currentColor" stroke-width="1.8"
+                            stroke-linecap="round" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="panel__title">Độ chính xác đã kiểm chứng</h2>
+                    <p class="panel__subtitle" id="benchSubtitle">Đo trên bộ trích dẫn có đáp án đã biết</p>
+                </div>
+            </div>
+            <div class="bench__body">
+                <div class="bench__headline" id="benchHeadline"></div>
+                <div class="bench__sets" id="benchSets"></div>
+                <details class="bench__caveats">
+                    <summary>Giới hạn của phép đo</summary>
+                    <ul id="benchCaveats"></ul>
+                </details>
+            </div>
         </section>
     </main>
 

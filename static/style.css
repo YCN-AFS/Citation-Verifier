@@ -376,3 +376,25 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);min-hei
     .hero__feature-tag{font-size:.6rem;padding:.22rem .55rem}
     .history-dropdown{width:calc(100vw - 2rem);right:-1rem}
 }
+
+/* ─── Benchmark panel ─── */
+.bench{margin-top:1.25rem}
+.bench__body{padding:1.15rem 1.5rem 1.35rem}
+.bench__headline{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.65rem;margin-bottom:1.15rem}
+.bench__stat{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem;text-align:center}
+.bench__stat-num{font-size:1.5rem;font-weight:800;font-family:var(--mono)}
+.bench__stat-label{font-size:.62rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-top:.1rem}
+.bench__stat--good .bench__stat-num{color:var(--green)}
+.bench__stat--accent .bench__stat-num{color:var(--accent)}
+.bench__set{margin-top:1rem}
+.bench__set-title{display:flex;justify-content:space-between;gap:.75rem;font-size:.82rem;font-weight:700;margin-bottom:.45rem}
+.bench__set-score{font-family:var(--mono);color:var(--text-secondary);font-weight:600;white-space:nowrap}
+.bench__row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(90px,1fr) 4.2rem;gap:.75rem;align-items:center;padding:.3rem 0;font-size:.76rem;color:var(--text-secondary)}
+.bench__bar{height:8px;border-radius:99px;background:var(--bg-elevated);border:1px solid var(--border);overflow:hidden}
+.bench__bar > span{display:block;height:100%;background:var(--green);border-radius:99px}
+.bench__bar > span.partial{background:var(--yellow)}
+.bench__num{font-family:var(--mono);text-align:right;color:var(--text)}
+.bench__caveats{margin-top:1.15rem;font-size:.76rem;color:var(--text-secondary)}
+.bench__caveats summary{cursor:pointer;font-weight:600;color:var(--text)}
+.bench__caveats ul{margin:.5rem 0 0 1.1rem;display:flex;flex-direction:column;gap:.35rem}
+@media (max-width:560px){.bench__row{grid-template-columns:minmax(0,1fr) 3.6rem}.bench__bar{display:none}}

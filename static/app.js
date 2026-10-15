@@ -628,3 +628,67 @@ editor.addEventListener('drop', (e) => {
         }
     });
 })();
+
+
+// ─── Benchmark panel ─────────────────────────────────────────
+function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+}
+
+function fmtPct(x) { return x.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
+
+function loadBenchmark() {
+    fetch('/api/benchmark')
+        .then(r => r.ok ? r.json() : null)
+        .then(b => { if (b) renderBenchmark(b); })
+        .catch(() => { /* panel simply stays hidden */ });
+}
+
+function renderBenchmark(b) {
+    const t = b.totals;
+    $('benchSubtitle').textContent =
+        `${t.cases} lượt đo (${b.unique_references} tham khảo khác nhau) · đo ngày ${b.measured_on} · phiên bản ${b.code_version}`;
+
+    const head = $('benchHeadline');
+    [
+        [`${t.false_accepts}`, 'Chấp nhận nhầm', 'bench__stat--good'],
+        [`${t.false_rejects}`, 'Từ chối nhầm', 'bench__stat--good'],
+        [fmtPct(t.accuracy), `Chính xác (${t.correct}/${t.cases})`, 'bench__stat--accent'],
+    ].forEach(([num, label, cls]) => {
+        const c = el('div', 'bench__stat ' + cls);
+        c.append(el('div', 'bench__stat-num', num), el('div', 'bench__stat-label', label));
+        head.append(c);
+    });
+
+    const sets = $('benchSets');
+    b.sets.forEach(s => {
+        const box = el('div', 'bench__set');
+        const title = el('div', 'bench__set-title');
+        title.append(el('span', '', s.label_vi), el('span', 'bench__set-score', `${s.correct}/${s.cases} · ${fmtPct(s.accuracy)}`));
+        box.append(title);
+        s.classes.forEach(c => {
+            const row = el('div', 'bench__row');
+            const bar = el('div', 'bench__bar');
+            const fill = el('span', c.correct === c.total ? '' : 'partial');
+            fill.style.width = (100 * c.correct / c.total) + '%';
+            bar.append(fill);
+            row.append(el('span', '', c.label_vi), bar, el('span', 'bench__num', `${c.correct}/${c.total}`));
+            row.title = `Kết quả đúng: ${c.expected}`;
+            box.append(row);
+        });
+        sets.append(box);
+    });
+
+    const ul = $('benchCaveats');
+    b.caveats_vi.forEach(x => ul.append(el('li', '', x)));
+    $('benchSection').classList.remove('hidden');
+
+    // Replace the generic hero tag with the measured figure (only if there is one).
+    const tag = $('heroBenchTag');
+    if (tag && t.false_accepts === 0) tag.textContent = `0 chấp nhận nhầm / ${t.cases} ca thử`;
+}
+
+loadBenchmark();

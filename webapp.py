@@ -7,11 +7,13 @@ Provides a visual, interactive UI with side-by-side comparison of
 cited text vs ground truth.
 """
 
+import json
 import logging
 import re
 import secrets
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 
 from flask import Flask, g, jsonify, render_template, request
 from flask_cors import CORS
@@ -156,6 +158,43 @@ def _run_verification(text, cross_validate, owner, progress_cb=None):
         owner=owner,
     )
     return response
+
+
+_BENCHMARK_FILE = Path(__file__).parent / "benchmark" / "summary.json"
+
+
+def _benchmark_summary():
+    """Benchmark results (benchmark/summary.json) plus derived totals, or None."""
+    try:
+        data = json.loads(_BENCHMARK_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    cases = correct = 0
+    for s in data["sets"]:
+        s["cases"] = sum(c["total"] for c in s["classes"])
+        s["correct"] = sum(c["correct"] for c in s["classes"])
+        s["accuracy"] = round(100 * s["correct"] / s["cases"], 1) if s["cases"] else 0.0
+        cases += s["cases"]
+        correct += s["correct"]
+    data["totals"] = {
+        "cases": cases,
+        "correct": correct,
+        "accuracy": round(100 * correct / cases, 1) if cases else 0.0,
+        "false_accepts": sum(s["false_accepts"] for s in data["sets"]),
+        "false_rejects": sum(s["false_rejects"] for s in data["sets"]),
+    }
+    return data
+
+
+@app.route("/api/benchmark")
+def benchmark():
+    """Measured accuracy of the verifier on the labeled benchmark sets."""
+    data = _benchmark_summary()
+    if data is None:
+        return jsonify({"error": "Benchmark results not available"}), 404
+    resp = jsonify(data)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
 
 
 @app.route("/api/verify", methods=["POST"])
