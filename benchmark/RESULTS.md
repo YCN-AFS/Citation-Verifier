@@ -51,3 +51,43 @@ titles have ≥ 4 words.
   fabrications (a plausible title plus the real authors of a *different* paper) are not covered yet.
 * OpenAlex returned HTTP 429 on many title searches during the runs; the system fell back to
   Crossref, so results are unaffected, but search results are not cached yet.
+
+## Fresh sample and harder adversaries
+
+Datasets: `cases.jsonl` (original, seed 7), `cases_seed101.jsonl` (fresh Crossref sample, same classes),
+`cases_hard.jsonl` (`--hard`: no-DOI classes aimed at title-only matching). Run any of them with
+`run_benchmark.py --cases <file>`.
+
+First run on the new sets exposed what the original set could not:
+
+| Set | Accuracy | False accepts | Notes |
+|---|---|---|---|
+| seed101 (210) | 209/210 = 99.5% | 0 | the original 100% was partly fitted; a fresh sample holds up |
+| hard (120) | 108/120 = 90.0% | **2** (`fake_authors`) | see below |
+
+Causes of the two false accepts, both real design gaps:
+
+* `fake_authors-023`: "Chen" is a common surname that happened to be *later* in the real author list, so
+  "any surname matches" validated an invented first author. → the **cited first author** must now be one of
+  the record's authors (`comparator._cited_first_surname`, order- and initials-tolerant).
+* `fake_authors-029`: the matching Crossref record had no author data, so invented authors went unchecked and
+  a near-exact title alone was enough. → a citation that names authors is **no longer confirmed by a record
+  without author data**.
+
+Recall: 8 of 10 `truncated_subtitle` misses were not bugs — the search engine ranked a different paper first.
+The verifier now evaluates **every candidate** from OpenAlex then Crossref (`search_candidates`) and keeps the
+first one that can be confirmed, instead of judging only the top hit.
+
+After these changes:
+
+| Set | Accuracy | False accepts | False rejects |
+|---|---|---|---|
+| original (209) | 209/209 = 100% | 0 | 0 |
+| seed101 (210) | 209/210 = 99.5% | 0 | 0 |
+| hard (120) | 114/120 = 95.0% | 0 | 0 |
+
+Remaining misses are all "could not confirm" (NO_DOI), never wrong acceptance. Known causes:
+the cited truncated title is too generic for the right paper to be among the top candidates,
+the found record lists different authors, or a title-search request was rate-limited
+(`title_only-007` in the hard set: Crossref and OpenAlex both returned HTTP 429, and a failed
+search currently reports NO_DOI rather than API_ERROR).

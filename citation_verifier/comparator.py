@@ -9,6 +9,7 @@ Enhanced with author surname comparison for higher accuracy.
 """
 
 import logging
+import re
 from typing import Optional
 
 from rapidfuzz import fuzz
@@ -206,15 +207,46 @@ TITLE_ONLY_MIN_WORDS_SUBSET = 4    # shorter title must have this many words to
                                    # be trusted as a truncated/subtitle-less citation
 
 
+_INITIALS = re.compile(r"^(?:[A-ZÀ-ÖØ-Ý]\.?\s?){1,3}$")
+
+
+def _cited_first_surname(authors_raw: str) -> Optional[str]:
+    """
+    Surname of the first cited author, whatever the name order.
+
+    "Hobbs, N. T., Hooten" → hobbs; "N. Thompson Hobbs and M. Hooten" → hobbs;
+    "Hobbs NT, Hooten MB" → hobbs. Returns None if it cannot be determined.
+    """
+    segments = [s.strip() for s in re.split(r",|;|&|\band\b", authors_raw) if s.strip()]
+    if not segments:
+        return None
+    first = segments[0]
+    if len(segments) > 1 and _INITIALS.match(segments[1]):
+        name = first                       # "Surname, I."
+    else:
+        words = first.split()
+        if len(words) >= 2 and _INITIALS.match(words[-1]):
+            name = words[0]                # "Surname IN"
+        else:
+            name = words[-1] if words else ""   # "Given Surname"
+    tokens = normalize_author_name(name).split()
+    return tokens[-1] if tokens and len(tokens[-1]) >= 2 else None
+
+
 def authors_overlap(
     reference: ParsedReference,
     ground_truth: GroundTruth,
 ) -> Optional[bool]:
     """
-    Does any ground-truth author surname appear in the cited author text?
+    Is the cited FIRST author one of the ground-truth authors?
 
-    Robust to initials and formats ("Hobbs, N. T.", "N. Thompson Hobbs",
-    "Hobbs NT") because it only checks whole-word surname presence.
+    Requiring the first author (rather than any surname) stops common
+    surnames ("Chen", "Smith") that happen to appear later in a real
+    author list from validating an invented citation. If the first author
+    cannot be parsed, falls back to whole-word presence of any surname.
+
+    Robust to initials and name order ("Hobbs, N. T.", "N. Thompson Hobbs",
+    "Hobbs NT").
 
     Returns:
         True/False, or None if either side has no author information.
@@ -224,6 +256,9 @@ def authors_overlap(
     gt_surnames = {s for s in extract_surnames(ground_truth.authors) if len(s) >= 2}
     if not gt_surnames:
         return None
+    first = _cited_first_surname(reference.authors_raw)
+    if first:
+        return first in gt_surnames
     cited_words = set(normalize_author_name(reference.authors_raw).split())
     return bool(gt_surnames & cited_words)
 
@@ -241,8 +276,10 @@ def confirm_title_only_match(
         2. max(ratio, token_sort) ≥ TITLE_ONLY_MIN_STRICT_SCORE — token_set
            alone is inflated whenever one title's words are a subset of the
            other's (e.g. "Hierarchical Bayesian Models")
-        3. at least one author surname agrees; if the citation lists no
-           authors, the title must be near-exact (score ≥ 95, strict ≥ 90)
+        3. the cited first author is among the record's authors (a record
+           with no author data cannot confirm a citation that names authors);
+           if the citation lists no authors, the title must be near-exact
+           (score ≥ 95, strict ≥ 90)
         4. years (when both known) differ by at most TITLE_ONLY_MAX_YEAR_GAP
            (a wider gap is tolerated when authors agree: online-first vs print)
 
@@ -283,14 +320,19 @@ def confirm_title_only_match(
             )
     if overlap is False:
         return False, "a similar title exists but none of the cited authors match"
-    if overlap is None and (
-        score < TITLE_ONLY_MIN_SCORE_NO_AUTHORS
-        or strict < TITLE_ONLY_MIN_STRICT_SCORE_NO_AUTHORS
-    ):
-        return False, (
-            f"no authors to confirm the match; title similarity "
-            f"{score:.1f}% (strict {strict:.1f}%) is not near-exact"
-        )
+    if overlap is None:
+        if reference.authors_raw:
+            # The citation names authors but the found record has none to
+            # check them against — an exact title alone must not vouch for them.
+            return False, "the matching record has no author data to confirm the cited authors"
+        if (
+            score < TITLE_ONLY_MIN_SCORE_NO_AUTHORS
+            or strict < TITLE_ONLY_MIN_STRICT_SCORE_NO_AUTHORS
+        ):
+            return False, (
+                f"no authors to confirm the match; title similarity "
+                f"{score:.1f}% (strict {strict:.1f}%) is not near-exact"
+            )
 
     max_gap = TITLE_ONLY_MAX_YEAR_GAP_AUTHORS if overlap is True else TITLE_ONLY_MAX_YEAR_GAP
     if year_gap is not None and year_gap > max_gap:

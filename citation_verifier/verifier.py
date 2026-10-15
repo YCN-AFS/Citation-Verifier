@@ -321,40 +321,34 @@ class CitationVerifier:
 
         logger.info("No DOI found. Searching by title: '%s'", title[:80])
 
-        # Try OpenAlex first (larger catalog)
-        ground_truth = self.openalex.search_by_title(title)
+        # Search OpenAlex first (larger catalog), then Crossref. A truncated or
+        # generic title often ranks the cited paper below the first hit, so
+        # every candidate is checked and the first one that can be CONFIRMED
+        # (title + author + year evidence) wins.
+        best = None            # (score, ground_truth, comparison, reason) of the best rejected
+        for client in (self.openalex, self.crossref):
+            for candidate in client.search_candidates(title):
+                if not candidate.title:
+                    continue
+                comparison = compare(ref, candidate)
+                confirmed, reason = confirm_title_only_match(ref, candidate, comparison)
+                if confirmed:
+                    result.ground_truth = candidate
+                    result.comparison = comparison
+                    result.verdict = Verdict.TITLE_MATCHED
+                    return result
+                if best is None or comparison.final_score > best[0]:
+                    best = (comparison.final_score, candidate, comparison, reason)
 
-        # Fallback to Crossref bibliographic search
-        if ground_truth is None:
-            ground_truth = self.crossref.search_by_title(title)
-
-        if ground_truth is None:
-            result.verdict = Verdict.NO_DOI
+        result.verdict = Verdict.NO_DOI
+        if best is None:
             result.error_message = "No DOI and title search returned no results."
             return result
 
-        result.ground_truth = ground_truth
-
-        # Compare the search result against the cited text
-        if ground_truth.title:
-            comparison = compare(ref, ground_truth)
-            result.comparison = comparison
-
-            # A similar title alone is not proof: also require author/year
-            # agreement and a score not inflated by word-subset matching.
-            confirmed, reason = confirm_title_only_match(ref, ground_truth, comparison)
-            if confirmed:
-                result.verdict = Verdict.TITLE_MATCHED
-            else:
-                result.verdict = Verdict.NO_DOI
-                result.error_message = (
-                    f"Title search found a candidate but it could not be "
-                    f"confirmed: {reason}."
-                )
-        else:
-            result.verdict = Verdict.NO_DOI
-            result.error_message = "Title search returned no usable title."
-
+        _, result.ground_truth, result.comparison, reason = best
+        result.error_message = (
+            f"Title search found a candidate but it could not be confirmed: {reason}."
+        )
         return result
 
     def _cross_validate_with_openalex(

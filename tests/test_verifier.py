@@ -191,11 +191,13 @@ class TestVerifierWithoutDOI:
     def test_title_found_high_score(self, parsed_ref_no_doi):
         """High-confidence title match should produce TITLE_MATCHED."""
         verifier = self._make_verifier()
-        verifier.openalex.search_by_title.return_value = GroundTruth(
+        verifier.openalex.search_candidates.return_value = [GroundTruth(
             doi="10.48550/arXiv.1706.03762",
             title="Attention Is All You Need",
+            authors=["Ashish Vaswani", "Noam Shazeer"],
+            year=2017,
             api_source="OpenAlex",
-        )
+        )]
 
         result = verifier._verify_single(parsed_ref_no_doi)
         assert result.verdict == Verdict.TITLE_MATCHED
@@ -203,11 +205,11 @@ class TestVerifierWithoutDOI:
     def test_title_found_low_score(self, parsed_ref_no_doi):
         """Low-confidence title match should remain NO_DOI."""
         verifier = self._make_verifier()
-        verifier.openalex.search_by_title.return_value = GroundTruth(
+        verifier.openalex.search_candidates.return_value = [GroundTruth(
             doi="10.9999/different",
             title="A Completely Different Marine Biology Paper",
             api_source="OpenAlex",
-        )
+        )]
 
         result = verifier._verify_single(parsed_ref_no_doi)
         assert result.verdict == Verdict.NO_DOI
@@ -223,12 +225,14 @@ class TestVerifierWithoutDOI:
     def test_title_search_fallback_to_crossref(self, parsed_ref_no_doi):
         """When OpenAlex title search fails, should try Crossref."""
         verifier = self._make_verifier()
-        verifier.openalex.search_by_title.return_value = None
-        verifier.crossref.search_by_title.return_value = GroundTruth(
+        verifier.openalex.search_candidates.return_value = []
+        verifier.crossref.search_candidates.return_value = [GroundTruth(
             doi="10.48550/arXiv.1706.03762",
             title="Attention Is All You Need",
+            authors=["Ashish Vaswani", "Noam Shazeer"],
+            year=2017,
             api_source="Crossref",
-        )
+        )]
 
         result = verifier._verify_single(parsed_ref_no_doi)
         assert result.verdict == Verdict.TITLE_MATCHED
@@ -364,8 +368,8 @@ class TestVerifyText:
         verifier.crossref.fetch_by_doi.return_value = None
         verifier.datacite.fetch_by_doi.return_value = None
         verifier.openalex.fetch_by_doi.return_value = None
-        verifier.openalex.search_by_title.return_value = None
-        verifier.crossref.search_by_title.return_value = None
+        verifier.openalex.search_candidates.return_value = []
+        verifier.crossref.search_candidates.return_value = []
 
         text = "[1]. Author A (2020). Title A. doi:10.1234/a\n[2]. Author B (2021). Title B. doi:10.1234/b"
 

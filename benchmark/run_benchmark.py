@@ -6,7 +6,7 @@ Each case is verified on its own (so reference parsing is part of what is
 measured). Uses an isolated temp cache, never the production databases.
 
 Key safety metric: FALSE ACCEPTS — a case whose reference is wrong
-(wrong_title / fake_doi / retracted / fake_title) that came back VERIFIED
+(wrong_title / fake_doi / retracted / fake_title / fake_authors / fake_mixed) that came back VERIFIED
 or TITLE_MATCHED. The README promises this is zero.
 
 Usage:  python benchmark/run_benchmark.py [--limit N] [--json out.json]
@@ -28,12 +28,13 @@ from citation_verifier import cache  # noqa: E402
 from citation_verifier.verifier import CitationVerifier  # noqa: E402
 
 CASES = Path(__file__).parent / "cases.jsonl"
-BAD_KINDS = {"wrong_title", "fake_doi", "retracted", "fake_title"}
+BAD_KINDS = {"wrong_title", "fake_doi", "retracted", "fake_title", "fake_authors", "fake_mixed"}
 ACCEPT = {"VERIFIED", "TITLE_MATCHED"}
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--cases", type=Path, default=CASES)
     ap.add_argument("--limit", type=int)
     ap.add_argument("--json")
     args = ap.parse_args()
@@ -42,7 +43,7 @@ def main():
     cache._DB_PATH = tmp / "cache.db"
     cache._local = threading.local()
 
-    cases = [json.loads(line) for line in CASES.open(encoding="utf-8")]
+    cases = [json.loads(line) for line in args.cases.open(encoding="utf-8")]
     if args.limit:
         cases = cases[: args.limit]
 

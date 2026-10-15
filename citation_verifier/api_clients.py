@@ -9,7 +9,7 @@ rate-limit awareness (HTTP 429), and standardized output via GroundTruth.
 import logging
 import threading
 import time
-from typing import Optional
+from typing import List, Optional
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -179,6 +179,11 @@ class CrossrefClient:
             raise ApiUnavailable(f"Crossref: {e}") from e
 
     def search_by_title(self, title: str, rows: int = 3) -> Optional[GroundTruth]:
+        """Best (first) Crossref title-search result, or None."""
+        candidates = self.search_candidates(title, rows)
+        return candidates[0] if candidates else None
+
+    def search_candidates(self, title: str, rows: int = 3) -> List[GroundTruth]:
         """
         Search Crossref by bibliographic query (title-based).
 
@@ -187,7 +192,7 @@ class CrossrefClient:
             rows: Number of results to retrieve (default 3).
 
         Returns:
-            Best-matching GroundTruth, or None.
+            Candidate GroundTruths in relevance order (empty if none/error).
         """
         params = {
             "query.bibliographic": strip_markup(title),
@@ -201,23 +206,22 @@ class CrossrefClient:
             resp.raise_for_status()
             items = resp.json().get("message", {}).get("items", [])
 
-            if not items:
-                return None
-
-            # Return the top result (Crossref ranks by relevance)
-            best = items[0]
-            return GroundTruth(
-                doi=best.get("DOI"),
-                title=self._extract_title(best),
-                authors=self._extract_authors(best),
-                year=self._extract_year(best),
-                source_journal=self._extract_journal(best),
-                api_source="Crossref",
-            )
+            # Crossref ranks by relevance; callers pick the first confirmed one
+            return [
+                GroundTruth(
+                    doi=item.get("DOI"),
+                    title=self._extract_title(item),
+                    authors=self._extract_authors(item),
+                    year=self._extract_year(item),
+                    source_journal=self._extract_journal(item),
+                    api_source="Crossref",
+                )
+                for item in items
+            ]
 
         except requests.exceptions.RequestException as e:
             logger.error("Crossref search error: %s", e)
-            return None
+            return []
 
     @staticmethod
     def _extract_title(data: dict) -> Optional[str]:
@@ -428,6 +432,11 @@ class OpenAlexClient:
             raise ApiUnavailable(f"OpenAlex: {e}") from e
 
     def search_by_title(self, title: str, per_page: int = 3) -> Optional[GroundTruth]:
+        """Best (first) OpenAlex title-search result, or None."""
+        candidates = self.search_candidates(title, per_page)
+        return candidates[0] if candidates else None
+
+    def search_candidates(self, title: str, per_page: int = 3) -> List[GroundTruth]:
         """
         Search OpenAlex by title text.
 
@@ -438,7 +447,7 @@ class OpenAlexClient:
             per_page: Number of results (default 3).
 
         Returns:
-            Best-matching GroundTruth, or None.
+            Candidate GroundTruths in relevance order (empty if none/error).
         """
         params = {
             "search": strip_markup(title),
@@ -452,14 +461,11 @@ class OpenAlexClient:
             resp.raise_for_status()
             results = resp.json().get("results", [])
 
-            if not results:
-                return None
-
-            return self._parse_work(results[0])
+            return [self._parse_work(r) for r in results]
 
         except requests.exceptions.RequestException as e:
             logger.error("OpenAlex search error: %s", e)
-            return None
+            return []
 
     def _parse_work(self, data: dict) -> GroundTruth:
         """Parse an OpenAlex work object into a GroundTruth."""

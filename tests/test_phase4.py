@@ -86,7 +86,7 @@ class TestVerifierUsesConfirmation:
     def _verifier(self, gt):
         v = CitationVerifier(cross_validate=False)
         v.openalex, v.crossref = MagicMock(), MagicMock()
-        v.openalex.search_by_title.return_value = gt
+        v.openalex.search_candidates.return_value = [gt]
         return v
 
     def test_unconfirmed_candidate_is_no_doi(self):

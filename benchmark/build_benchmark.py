@@ -13,6 +13,11 @@ records (so labels are trustworthy), then optionally corrupted:
   title_only    real title, no DOI                       -> TITLE_MATCHED
   fake_title    invented title, no DOI                   -> NO_DOI
 
+Extra "hard" classes (--hard; no DOI, aimed at title-only matching):
+  truncated_subtitle  real title minus subtitle, real authors -> TITLE_MATCHED
+  fake_authors        real title/year/journal, invented authors -> NO_DOI
+  fake_mixed          halves of two real titles + real authors of one -> NO_DOI
+
 Usage:  python benchmark/build_benchmark.py [--per-class 30] [--seed 7]
 Writes: benchmark/cases.jsonl
 """
@@ -135,6 +140,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-class", type=int, default=30)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--hard", action="store_true", help="build only the hard no-DOI classes")
+    ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
     n, rng = args.per_class, random.Random(args.seed)
 
@@ -143,6 +150,11 @@ def main():
     def add(kind, expected, text, **extra):
         cases.append({"id": f"{kind}-{sum(c['kind'] == kind for c in cases) + 1:03d}",
                       "kind": kind, "expected": expected, "text": text, **extra})
+
+    if args.hard:
+        build_hard(cases, n, rng)
+        write(cases, args.out)
+        return
 
     pool = [meta(i) for i in sample_real(n * 5 + 5, rng)]
     it = iter(pool)
@@ -178,13 +190,49 @@ def main():
         add("fake_title", ["NO_DOI"],
             f"Nowak, K., Ivanova, P. ({rng.randint(2008, 2023)}). {t}. Journal of Imaginary Results.")
 
-    with OUT.open("w", encoding="utf-8") as f:
+    write(cases, args.out)
+
+
+def write(cases, out):
+    with out.open("w", encoding="utf-8") as f:
         for c in cases:
             f.write(json.dumps(c, ensure_ascii=False) + "\n")
     kinds = {}
     for c in cases:
         kinds[c["kind"]] = kinds.get(c["kind"], 0) + 1
-    print(f"wrote {len(cases)} cases -> {OUT}\n{kinds}")
+    print(f"wrote {len(cases)} cases -> {out}\n{kinds}")
+
+
+_SURNAMES = ["Nowak", "Ivanova", "Okafor", "Lindqvist", "Tanaka", "Moreau", "Haddad",
+             "Petrov", "Santos", "Kowalski", "Ibrahim", "Johansson", "Chen", "Mukherjee"]
+
+
+def _fake_authors(rng):
+    names = rng.sample(_SURNAMES, 2)
+    return f"{names[0]}, {rng.choice('ABCDEFGHJKLMNPRSTVW')}., {names[1]}, {rng.choice('ABCDEFGHJKLMNPRSTVW')}."
+
+
+def build_hard(cases, n, rng):
+    """No-DOI classes designed to tempt a title-only matcher."""
+    def add(kind, expected, text):
+        cases.append({"id": f"{kind}-{sum(c['kind'] == kind for c in cases) + 1:03d}",
+                      "kind": kind, "expected": expected, "text": text})
+
+    # Positive control: dropping the subtitle is common and must still verify.
+    with_sub = [m for m in (meta(i) for i in sample_real(n * 12, rng))
+                if ":" in m["title"] and len(m["title"].split(":")[0].split()) >= 4]
+    for m in with_sub[:n]:
+        add("truncated_subtitle", ["TITLE_MATCHED"], ref_text(m, title=m["title"].split(":")[0], doi=False))
+
+    pool = [meta(i) for i in sample_real(n * 4, rng)]
+    for m in pool[:n]:
+        add("title_only", ["TITLE_MATCHED"], ref_text(m, doi=False))
+    for m in pool[n:2 * n]:
+        add("fake_authors", ["NO_DOI"], ref_text({**m, "authors": _fake_authors(rng)}, doi=False))
+    for a, b in zip(pool[2 * n:3 * n], pool[3 * n:4 * n]):
+        wa, wb = a["title"].split(), b["title"].split()
+        mixed = " ".join(wa[: max(3, len(wa) // 2)] + wb[len(wb) // 2:])
+        add("fake_mixed", ["NO_DOI"], ref_text({**a}, title=mixed, doi=False))
 
 
 if __name__ == "__main__":
