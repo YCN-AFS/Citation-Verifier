@@ -44,6 +44,34 @@ class TestSummaryFile:
         assert all(s["false_accepts"] == 0 for s in summary["sets"])
 
 
+class TestGeneratedArtifacts:
+    """README block and docs/benchmark.svg are generated from summary.json."""
+
+    @pytest.fixture(scope="class")
+    def renderer(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("render_readme", ROOT / "benchmark" / "render_readme.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_readme_block_is_up_to_date(self, summary, renderer):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        assert renderer.render_block(summary) in readme, "run: python benchmark/render_readme.py"
+
+    def test_svg_is_up_to_date(self, summary, renderer):
+        svg = (ROOT / "docs" / "benchmark.svg").read_text(encoding="utf-8")
+        assert svg == renderer.render_svg(summary), "run: python benchmark/render_readme.py"
+
+    def test_published_run_had_no_api_errors(self, summary):
+        # an API_ERROR counts as "not correct"; a published run must not hide behind them
+        assert all(s.get("api_errors", 0) == 0 for s in summary["sets"])
+
+    def test_caveats_do_not_claim_stale_measurements(self, summary):
+        text = " ".join(summary["caveats_vi"] + summary["caveats_en"]).lower()
+        assert "not been re-measured" not in text and "chưa đo lại" not in text
+
+
 class TestEndpoint:
     @pytest.fixture
     def client(self):
@@ -87,3 +115,4 @@ class TestReadmeAgrees:
         assert 'id="benchSection"' in html
         assert "/api/benchmark" in js and "renderBenchmark" in js
         assert re.search(r"textContent", js)   # data is rendered as text, not HTML
+        assert 'id="benchRingFg"' in html

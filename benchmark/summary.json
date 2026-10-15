@@ -1,6 +1,6 @@
 {
   "measured_on": "2026-10-15",
-  "code_version": "0e1bac4",
+  "code_version": "c66613e",
   "unique_references": 509,
   "sets": [
     {
@@ -10,14 +10,64 @@
       "false_accepts": 0,
       "false_rejects": 0,
       "classes": [
-        {"kind": "good", "label_vi": "Trích dẫn đúng", "label_en": "Correct citation", "expected": "VERIFIED", "correct": 30, "total": 30},
-        {"kind": "noisy", "label_vi": "Đúng nhưng sai định dạng (hoa/thường, dấu câu)", "label_en": "Correct, noisy formatting", "expected": "VERIFIED", "correct": 30, "total": 30},
-        {"kind": "wrong_title", "label_vi": "DOI thật, tiêu đề của bài khác", "label_en": "Real DOI, another paper's title", "expected": "MISMATCH", "correct": 29, "total": 29},
-        {"kind": "fake_doi", "label_vi": "DOI bịa", "label_en": "Fabricated DOI", "expected": "DEAD_DOI", "correct": 30, "total": 30},
-        {"kind": "retracted", "label_vi": "Bài đã bị rút", "label_en": "Retracted paper", "expected": "RETRACTED", "correct": 30, "total": 30},
-        {"kind": "title_only", "label_vi": "Không có DOI, tìm theo tiêu đề", "label_en": "No DOI, title lookup", "expected": "TITLE_MATCHED", "correct": 30, "total": 30},
-        {"kind": "fake_title", "label_vi": "Tiêu đề và tác giả bịa, không DOI", "label_en": "Invented title and authors, no DOI", "expected": "NO_DOI", "correct": 30, "total": 30}
-      ]
+        {
+          "kind": "good",
+          "label_vi": "Trích dẫn đúng",
+          "label_en": "Correct citation",
+          "expected": "VERIFIED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "noisy",
+          "label_vi": "Đúng nhưng sai định dạng (hoa/thường, dấu câu)",
+          "label_en": "Correct, noisy formatting",
+          "expected": "VERIFIED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "wrong_title",
+          "label_vi": "DOI thật, tiêu đề của bài khác",
+          "label_en": "Real DOI, another paper's title",
+          "expected": "MISMATCH",
+          "correct": 29,
+          "total": 29
+        },
+        {
+          "kind": "fake_doi",
+          "label_vi": "DOI bịa",
+          "label_en": "Fabricated DOI",
+          "expected": "DEAD_DOI",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "retracted",
+          "label_vi": "Bài đã bị rút",
+          "label_en": "Retracted paper",
+          "expected": "RETRACTED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "title_only",
+          "label_vi": "Không có DOI, tìm theo tiêu đề",
+          "label_en": "No DOI, title lookup",
+          "expected": "TITLE_MATCHED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "fake_title",
+          "label_vi": "Tiêu đề và tác giả bịa, không DOI",
+          "label_en": "Invented title and authors, no DOI",
+          "expected": "NO_DOI",
+          "correct": 30,
+          "total": 30
+        }
+      ],
+      "api_errors": 0
     },
     {
       "id": "fresh",
@@ -26,14 +76,64 @@
       "false_accepts": 0,
       "false_rejects": 0,
       "classes": [
-        {"kind": "good", "label_vi": "Trích dẫn đúng", "label_en": "Correct citation", "expected": "VERIFIED", "correct": 30, "total": 30},
-        {"kind": "noisy", "label_vi": "Đúng nhưng sai định dạng (hoa/thường, dấu câu)", "label_en": "Correct, noisy formatting", "expected": "VERIFIED", "correct": 30, "total": 30},
-        {"kind": "wrong_title", "label_vi": "DOI thật, tiêu đề của bài khác", "label_en": "Real DOI, another paper's title", "expected": "MISMATCH", "correct": 30, "total": 30},
-        {"kind": "fake_doi", "label_vi": "DOI bịa", "label_en": "Fabricated DOI", "expected": "DEAD_DOI", "correct": 30, "total": 30},
-        {"kind": "retracted", "label_vi": "Bài đã bị rút", "label_en": "Retracted paper", "expected": "RETRACTED", "correct": 30, "total": 30},
-        {"kind": "title_only", "label_vi": "Không có DOI, tìm theo tiêu đề", "label_en": "No DOI, title lookup", "expected": "TITLE_MATCHED", "correct": 29, "total": 30},
-        {"kind": "fake_title", "label_vi": "Tiêu đề và tác giả bịa, không DOI", "label_en": "Invented title and authors, no DOI", "expected": "NO_DOI", "correct": 30, "total": 30}
-      ]
+        {
+          "kind": "good",
+          "label_vi": "Trích dẫn đúng",
+          "label_en": "Correct citation",
+          "expected": "VERIFIED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "noisy",
+          "label_vi": "Đúng nhưng sai định dạng (hoa/thường, dấu câu)",
+          "label_en": "Correct, noisy formatting",
+          "expected": "VERIFIED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "wrong_title",
+          "label_vi": "DOI thật, tiêu đề của bài khác",
+          "label_en": "Real DOI, another paper's title",
+          "expected": "MISMATCH",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "fake_doi",
+          "label_vi": "DOI bịa",
+          "label_en": "Fabricated DOI",
+          "expected": "DEAD_DOI",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "retracted",
+          "label_vi": "Bài đã bị rút",
+          "label_en": "Retracted paper",
+          "expected": "RETRACTED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "title_only",
+          "label_vi": "Không có DOI, tìm theo tiêu đề",
+          "label_en": "No DOI, title lookup",
+          "expected": "TITLE_MATCHED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "fake_title",
+          "label_vi": "Tiêu đề và tác giả bịa, không DOI",
+          "label_en": "Invented title and authors, no DOI",
+          "expected": "NO_DOI",
+          "correct": 30,
+          "total": 30
+        }
+      ],
+      "api_errors": 0
     },
     {
       "id": "hard",
@@ -42,23 +142,52 @@
       "false_accepts": 0,
       "false_rejects": 0,
       "classes": [
-        {"kind": "truncated_subtitle", "label_vi": "Trích dẫn bỏ phụ đề (đúng)", "label_en": "Subtitle dropped (genuine)", "expected": "TITLE_MATCHED", "correct": 25, "total": 30},
-        {"kind": "title_only", "label_vi": "Không có DOI, tìm theo tiêu đề", "label_en": "No DOI, title lookup", "expected": "TITLE_MATCHED", "correct": 29, "total": 30},
-        {"kind": "fake_authors", "label_vi": "Tiêu đề thật, tác giả bịa", "label_en": "Real title, invented authors", "expected": "NO_DOI", "correct": 30, "total": 30},
-        {"kind": "fake_mixed", "label_vi": "Tiêu đề ghép từ hai bài, tác giả thật", "label_en": "Title spliced from two papers, real authors", "expected": "NO_DOI", "correct": 30, "total": 30}
-      ]
+        {
+          "kind": "truncated_subtitle",
+          "label_vi": "Trích dẫn bỏ phụ đề (đúng)",
+          "label_en": "Subtitle dropped (genuine)",
+          "expected": "TITLE_MATCHED",
+          "correct": 27,
+          "total": 30
+        },
+        {
+          "kind": "title_only",
+          "label_vi": "Không có DOI, tìm theo tiêu đề",
+          "label_en": "No DOI, title lookup",
+          "expected": "TITLE_MATCHED",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "fake_authors",
+          "label_vi": "Tiêu đề thật, tác giả bịa",
+          "label_en": "Real title, invented authors",
+          "expected": "NO_DOI",
+          "correct": 30,
+          "total": 30
+        },
+        {
+          "kind": "fake_mixed",
+          "label_vi": "Tiêu đề ghép từ hai bài, tác giả thật",
+          "label_en": "Title spliced from two papers, real authors",
+          "expected": "NO_DOI",
+          "correct": 30,
+          "total": 30
+        }
+      ],
+      "api_errors": 0
     }
   ],
   "caveats_vi": [
     "Bộ thử do nhóm phát triển tự tạo từ dữ liệu Crossref thật; hai điều chỉnh tiêu chí so khớp theo tiêu đề được viết sau khi thấy các ca lỗi tương ứng, nên kết quả có phần khớp theo dữ liệu.",
     "Mọi sai sót còn lại đều thuộc loại 'không xác nhận được' (trích dẫn đúng nhưng hệ thống từ chối xác nhận), không có trường hợp chấp nhận nhầm.",
     "30 bài bị rút xuất hiện ở cả bộ gốc và mẫu mới: 539 lượt đo tương ứng 509 tham khảo khác nhau.",
-    "Các ca không có DOI cần OpenAlex, hiện đang bị giới hạn ngân sách theo ngày nên chưa đo lại sau thay đổi gần nhất."
+    "Các ca không có DOI phụ thuộc OpenAlex (dùng khóa API); nếu nguồn này tạm lỗi, kết quả được ghi là API_ERROR và không được tính là đúng."
   ],
   "caveats_en": [
     "The sets were generated by the developers from real Crossref records; two title-matching relaxations were written after seeing the failing cases they fix, so results are partly fitted to the data.",
     "All remaining misses are 'could not confirm' (a genuine citation was not confirmed); there are no wrong acceptances.",
     "The same 30 retracted papers appear in both the original and fresh sets: 539 evaluations cover 509 distinct references.",
-    "No-DOI cases depend on OpenAlex, whose daily request budget is currently exhausted, so they have not been re-measured after the most recent change."
+    "No-DOI cases depend on OpenAlex (run with an API key); if that source is down the outcome is API_ERROR, which is counted as not correct, never as a pass."
   ]
 }

@@ -640,6 +640,19 @@ function el(tag, cls, text) {
 
 function fmtPct(x) { return x.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
 
+const BENCH_ICONS = {
+    shield: '<path d="M10 2l6 2.5v5c0 4-2.6 6.8-6 8-3.4-1.2-6-4-6-8v-5L10 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.2 10l2 2 3.6-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    check: '<path d="M5 10.5l3.2 3.2L15 6.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    layers: '<path d="M10 3l7 3.6-7 3.6-7-3.6L10 3zM3 10.2l7 3.6 7-3.6M3 13.6l7 3.6 7-3.6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>',
+};
+
+// icons are static markup from this file, never from API data
+function benchIcon(name) {
+    const w = el('span', 'bench__stat-icon');
+    w.innerHTML = `<svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">${BENCH_ICONS[name]}</svg>`;
+    return w;
+}
+
 function loadBenchmark() {
     fetch('/api/benchmark')
         .then(r => r.ok ? r.json() : null)
@@ -650,19 +663,23 @@ function loadBenchmark() {
 function renderBenchmark(b) {
     const t = b.totals;
     $('benchSubtitle').textContent =
-        `${t.cases} lượt đo (${b.unique_references} tham khảo khác nhau) · đo ngày ${b.measured_on} · phiên bản ${b.code_version}`;
+        `${t.cases} lượt đo trên ${b.unique_references} trích dẫn khác nhau · đo ngày ${b.measured_on} · phiên bản ${b.code_version}`;
+
+    const chips = $('benchChips');
+    ['Dữ liệu Crossref thật', 'Có cả trích dẫn bịa & bài bị rút', 'Mã nguồn và bộ thử công khai'].forEach(x => chips.append(el('span', 'bench__chip', x)));
 
     const head = $('benchHeadline');
     [
-        [`${t.false_accepts}`, 'Chấp nhận nhầm', 'bench__stat--good'],
-        [`${t.false_rejects}`, 'Từ chối nhầm', 'bench__stat--good'],
-        [fmtPct(t.accuracy), `Chính xác (${t.correct}/${t.cases})`, 'bench__stat--accent'],
-    ].forEach(([num, label, cls]) => {
+        [`${t.false_accepts}`, 'Chấp nhận nhầm', 'shield', ''],
+        [`${t.false_rejects}`, 'Từ chối nhầm', 'check', ''],
+        [`${t.correct}/${t.cases}`, 'Khớp đáp án', 'layers', 'bench__stat--accent'],
+    ].forEach(([num, label, icon, cls]) => {
         const c = el('div', 'bench__stat ' + cls);
-        c.append(el('div', 'bench__stat-num', num), el('div', 'bench__stat-label', label));
+        c.append(benchIcon(icon), el('div', 'bench__stat-num', num), el('div', 'bench__stat-label', label));
         head.append(c);
     });
 
+    const fills = [];
     const sets = $('benchSets');
     b.sets.forEach(s => {
         const box = el('div', 'bench__set');
@@ -673,7 +690,7 @@ function renderBenchmark(b) {
             const row = el('div', 'bench__row');
             const bar = el('div', 'bench__bar');
             const fill = el('span', c.correct === c.total ? '' : 'partial');
-            fill.style.width = (100 * c.correct / c.total) + '%';
+            fills.push([fill, 100 * c.correct / c.total]);
             bar.append(fill);
             row.append(el('span', '', c.label_vi), bar, el('span', 'bench__num', `${c.correct}/${c.total}`));
             row.title = `Kết quả đúng: ${c.expected}`;
@@ -684,7 +701,24 @@ function renderBenchmark(b) {
 
     const ul = $('benchCaveats');
     b.caveats_vi.forEach(x => ul.append(el('li', '', x)));
-    $('benchSection').classList.remove('hidden');
+
+    const section = $('benchSection');
+    section.classList.remove('hidden');
+    $('benchRingNum').textContent = fmtPct(t.accuracy);
+    $('benchRing').setAttribute('aria-label', `Độ chính xác ${fmtPct(t.accuracy)}`);
+
+    const animate = () => {
+        $('benchRingFg').style.strokeDashoffset = String(326.7 * (1 - t.accuracy / 100));
+        fills.forEach(([f, w]) => { f.style.width = w + '%'; });
+    };
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(es => {
+            if (es.some(e => e.isIntersecting)) { animate(); io.disconnect(); }
+        }, { threshold: 0.15 });
+        io.observe(section);
+    } else {
+        animate();
+    }
 
     // Replace the generic hero tag with the measured figure (only if there is one).
     const tag = $('heroBenchTag');
