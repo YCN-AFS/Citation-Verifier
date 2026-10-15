@@ -1,8 +1,31 @@
 # Benchmark results
 
-210 labeled references (30 per class), built from live Crossref records by
-`build_benchmark.py` and scored by `run_benchmark.py`. Re-run with
-`python benchmark/run_benchmark.py`; the exit code is 1 if any bad reference is accepted.
+## Current results
+
+Three labeled sets built from live Crossref records by `build_benchmark.py` and scored by
+`run_benchmark.py`: **539 evaluations** (209 + 210 + 120) covering **509 distinct references**
+(the same 30 retracted papers appear in both main sets). Last full run: 2026-10-15, code `c66613e`,
+with an OpenAlex API key.
+
+| Set | Cases | Expected verdict | Wrong acceptances | Wrong rejections |
+|---|---:|---:|---:|---:|
+| original (`cases.jsonl`) | 209 | 209 (100.0%) | 0 | 0 |
+| seed101 (`cases_seed101.jsonl`) | 210 | 210 (100.0%) | 0 | 0 |
+| hard (`cases_hard.jsonl`) | 120 | 117 (97.5%) | 0 | 0 |
+| **Total** | **539** | **536 (99.4%)** | **0** | **0** |
+
+The three misses are `truncated_subtitle` citations that are genuine but were not confirmed (`NO_DOI`).
+No run had `API_ERROR` outcomes. The per-class numbers are in `summary.json`, the single source of truth
+for the README and the web UI (regenerate with `make_summary.py` and `render_readme.py`).
+Re-run with `python benchmark/run_benchmark.py [--cases FILE]`; the exit code is 1 if any bad reference
+is accepted.
+
+The sections below are the history of how the benchmark was used to find and fix problems; the
+numbers in them are from the intermediate runs named in each heading, not from the current code.
+
+## First set: before and after the first fixes
+
+210 labeled references (30 per class) from the original set.
 
 | Class | Expected | Before fixes | After parser/API fixes | After TITLE_MATCHED hardening |
 |---|---|---|---|---|
@@ -24,6 +47,8 @@ it is indistinguishable from sentence punctuation.
 2. Publisher markup in titles (`<i>`, `<sub>`, `<scp>`) broke fuzzy matching and caused OpenAlex HTTP 400.
 3. urllib3 honoured an unbounded `Retry-After` on HTTP 429 and could block a worker for hours.
 4. Crossref `date-parts: [[null]]` raised `TypeError`; for batches of ≤ 3 references it failed the whole request.
+5. A `?` inside a title made OpenAlex answer HTTP 400, so any title phrased as a question could not be
+   searched and ended as `API_ERROR` (found while re-measuring on 2026-10-15; `?` is now stripped from the query).
 
 ## TITLE_MATCHED hardening (fixes the false accept)
 
@@ -41,7 +66,7 @@ at 85.7%. A DOI-less match is now confirmed only if all hold (`comparator.confir
 Rule 2 is waived for a dropped-subtitle citation only when authors AND year agree and both
 titles have ≥ 4 words.
 
-## Caveats on the 100%
+## Caveats on the early 100%
 
 * Two of the relaxations (rule 4's wider gap, the dropped-subtitle waiver) were written after
   seeing the two benchmark cases they fix, so the title_only result is partly fitted to this set.
@@ -50,7 +75,7 @@ titles have ≥ 4 words.
 * `fake_title` uses random-word titles with invented authors — a weak adversary. Realistic
   fabrications (a plausible title plus the real authors of a *different* paper) are not covered yet.
 * OpenAlex returned HTTP 429 on many title searches during the runs; the system fell back to
-  Crossref, so results are unaffected, but search results are not cached yet.
+  Crossref, so results were unaffected at that time (successful title searches are cached since then).
 
 ## Fresh sample and harder adversaries
 
@@ -104,10 +129,9 @@ client behind the same IP** (a title search costs 10 credits, so roughly 100 sea
 benchmark runs exhausted it (`HTTP 429`, `Retry-After: 66313`, reset at midnight UTC). Consequences:
 
 * Before this change that 429 was silently reported as `NO_DOI`; it is now correctly `API_ERROR`.
-* The deployed build (`63ef9e1`) still honours an unbounded `Retry-After`, so a DOI check with
-  cross-validation could block a worker until Gunicorn's timeout while the budget is spent.
-  Fixed on this branch (bounded retry policy, plus a circuit breaker that stops calling OpenAlex
-  for up to an hour once it reports an exhausted budget).
-* Production needs a free `OPENALEX_API_KEY` (sent as a Bearer header, never in the URL).
+* The earlier build honoured an unbounded `Retry-After`, so a DOI check with cross-validation could block
+  a worker until Gunicorn's timeout while the budget was spent. Fixed (bounded retry policy, plus a circuit
+  breaker that stops calling OpenAlex for up to an hour once it reports an exhausted budget) and deployed.
+* Production now runs with a free `OPENALEX_API_KEY` (sent as a Bearer header, never in the URL).
 
-Rerun the benchmark with a key (or after the budget resets) to measure the no-DOI classes again.
+The three sets were then re-measured with the key; those results are the "Current results" at the top.

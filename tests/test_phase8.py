@@ -59,6 +59,13 @@ class TestGeneratedArtifacts:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         assert renderer.render_block(summary) in readme, "run: python benchmark/render_readme.py"
 
+    def test_results_md_headline_matches_summary(self, summary):
+        text = (ROOT / "benchmark" / "RESULTS.md").read_text(encoding="utf-8")
+        cases, ok = (sum(c[k] for s in summary["sets"] for c in s["classes"]) for k in ("total", "correct"))
+        assert f"**{cases} evaluations**" in text
+        assert f"**{ok} ({100 * ok / cases:.1f}%)**" in text
+        assert f"**{summary['unique_references']} distinct references**" in text
+
     def test_published_run_had_no_api_errors(self, summary):
         # an API_ERROR counts as "not correct"; a published run must not hide behind them
         assert all(s.get("api_errors", 0) == 0 for s in summary["sets"])
