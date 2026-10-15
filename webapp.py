@@ -10,6 +10,7 @@ cited text vs ground truth.
 import logging
 import re
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from flask import Flask, g, jsonify, render_template, request
@@ -18,7 +19,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from citation_verifier import __version__
+from citation_verifier import __version__, jobs
 from citation_verifier.config import MAX_REFERENCES, Verdict
 from citation_verifier.history import (
     clear_all_sessions,
@@ -107,60 +108,117 @@ def health():
     })
 
 
+def _validate_request():
+    """Validate a verification request body.
+
+    Returns ``(text, cross_validate, error_response)``; on failure the
+    first two are None and ``error_response`` is a ready Flask response.
+    """
+    data = request.get_json(silent=True)
+    if not data or "text" not in data or not isinstance(data["text"], str):
+        return None, None, (jsonify({"error": "Missing 'text' field in request body."}), 400)
+
+    text = data["text"].strip()
+    if not text:
+        return None, None, (jsonify({"error": "Empty reference text."}), 400)
+
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return None, None, (jsonify({"error": "Invalid text encoding. UTF-8 required."}), 400)
+
+    # Limit input size to prevent abuse (max ~100KB or ~200 references)
+    if len(text) > 100_000:
+        return None, None, (jsonify({"error": "Input too large. Maximum 100,000 characters."}), 400)
+
+    # Estimate reference count (rough: one per non-empty line or DOI)
+    line_count = len([ln for ln in text.split("\n") if ln.strip()])
+    if line_count > MAX_REFERENCES:
+        return None, None, (jsonify({
+            "error": f"Too many references (~{line_count}). Maximum {MAX_REFERENCES}."
+        }), 400)
+
+    return text, bool(data.get("cross_validate", True)), None
+
+
+def _run_verification(text, cross_validate, owner, progress_cb=None):
+    """Verify, record stats, save to history and return the response dict."""
+    verifier = CitationVerifier(cross_validate=cross_validate)
+    results = verifier.verify_text(text, progress_cb=progress_cb)
+    increment_stats(len(results))
+    response = _serialize_results(results)
+    save_session(
+        total=response["total"],
+        summary=response["summary"],
+        has_critical=response["has_critical"],
+        input_text=text,
+        results_data=response,
+        owner=owner,
+    )
+    return response
+
+
 @app.route("/api/verify", methods=["POST"])
 @limiter.limit("10 per minute")
 def verify():
     """
-    API endpoint for citation verification.
+    Synchronous verification (kept for scripts / CI).
 
     Expects JSON body: { "text": "reference text..." }
-    Returns JSON with verification results.
+    Returns JSON with verification results. The web UI uses /api/jobs.
     """
-    data = request.get_json()
-    if not data or "text" not in data:
-        return jsonify({"error": "Missing 'text' field in request body."}), 400
-
-    text = data["text"].strip()
-    if not text:
-        return jsonify({"error": "Empty reference text."}), 400
-
-    # Validate encoding — reject non-UTF-8 content
+    text, cross_validate, err = _validate_request()
+    if err:
+        return err
     try:
-        text.encode("utf-8")
-    except UnicodeEncodeError:
-        return jsonify({"error": "Invalid text encoding. UTF-8 required."}), 400
-
-    # Limit input size to prevent abuse (max ~100KB or ~200 references)
-    if len(text) > 100_000:
-        return jsonify({"error": "Input too large. Maximum 100,000 characters."}), 400
-
-    # Estimate reference count (rough: one per non-empty line or DOI)
-    line_count = len([l for l in text.split("\n") if l.strip()])
-    if line_count > MAX_REFERENCES:
-        return jsonify({
-            "error": f"Too many references (~{line_count}). Maximum {MAX_REFERENCES}."
-        }), 400
-
-    cross_validate = data.get("cross_validate", True)
-
-    try:
-        verifier = CitationVerifier(cross_validate=cross_validate)
-        results = verifier.verify_text(text)
-        increment_stats(len(results))
-        response = _serialize_results(results)
-        # Save to history
-        save_session(
-            total=response["total"],
-            summary=response["summary"],
-            has_critical=response["has_critical"],
-            input_text=text,
-            results_data=response,
-            owner=_owner(),
-        )
-        return jsonify(response)
+        return jsonify(_run_verification(text, cross_validate, _owner()))
     except Exception as e:
         logger.error("Verification error: %s", e, exc_info=True)
         return jsonify({"error": f"Verification failed: {str(e)}"}), 500
+
+
+# ─── Asynchronous jobs (progress + no request-long worker blocking) ───
+
+# Per-process pool: bounds concurrent verifications on this worker.
+_job_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="verify-job")
+MAX_ACTIVE_JOBS_PER_USER = 2
+
+
+def _job_worker(job_id, text, cross_validate, owner):
+    try:
+        response = _run_verification(
+            text, cross_validate, owner,
+            progress_cb=lambda done, total: jobs.update_progress(job_id, done, total),
+        )
+        jobs.finish(job_id, response)
+    except Exception as e:
+        logger.error("Job %s failed: %s", job_id, e, exc_info=True)
+        jobs.fail(job_id, f"Verification failed: {e}")
+
+
+@app.route("/api/jobs", methods=["POST"])
+@limiter.limit("10 per minute")
+def job_create():
+    """Start a verification job. Returns 202 with the job id to poll."""
+    text, cross_validate, err = _validate_request()
+    if err:
+        return err
+    owner = _owner()
+    if jobs.count_active(owner) >= MAX_ACTIVE_JOBS_PER_USER:
+        return jsonify({"error": "Too many verifications in progress. Please wait."}), 429
+    job_id = jobs.create_job(owner)
+    _job_pool.submit(_job_worker, job_id, text, cross_validate, owner)
+    return jsonify({"id": job_id}), 202
+
+
+@app.route("/api/jobs/<job_id>")
+@limiter.exempt
+def job_status(job_id):
+    """Poll a job: {status: running|done|failed, done, total, result?}."""
+    job = jobs.get_job(job_id, _owner())
+    if job is None:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
 
 
 def _serialize_results(results: list) -> dict:
@@ -268,6 +326,7 @@ def cache_cleanup():
     return jsonify({
         "cache": cache_result,
         "history": history_result,
+        "jobs": {"removed": jobs.cleanup()},
     })
 
 

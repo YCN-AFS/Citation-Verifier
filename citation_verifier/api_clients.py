@@ -7,6 +7,7 @@ rate-limit awareness (HTTP 429), and standardized output via GroundTruth.
 """
 
 import logging
+import threading
 import time
 from typing import Optional
 
@@ -31,6 +32,34 @@ from .config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _Throttle:
+    """Thread-safe minimum spacing between calls to one API.
+
+    Shared by every client instance in the process (a new verifier is
+    created per request, so per-instance state could not limit anything).
+    """
+
+    def __init__(self, delay: float):
+        self._delay = delay
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def wait(self):
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next:
+                time.sleep(self._next - now)
+                now = self._next
+            self._next = now + self._delay
+
+
+_THROTTLES = {
+    "Crossref": _Throttle(RATE_LIMIT_DELAY),
+    "DataCite": _Throttle(RATE_LIMIT_DELAY),
+    "OpenAlex": _Throttle(RATE_LIMIT_DELAY),
+}
 
 
 class ApiUnavailable(Exception):
@@ -97,14 +126,10 @@ class CrossrefClient:
     def __init__(self):
         self.session = _create_session()
         self.base_url = CROSSREF_API_BASE
-        self._last_request_time = 0.0
 
     def _rate_limit(self):
-        """Enforce minimum delay between requests."""
-        elapsed = time.time() - self._last_request_time
-        if elapsed < RATE_LIMIT_DELAY:
-            time.sleep(RATE_LIMIT_DELAY - elapsed)
-        self._last_request_time = time.time()
+        """Enforce minimum delay between requests (shared across threads)."""
+        _THROTTLES["Crossref"].wait()
 
     def fetch_by_doi(self, doi: str) -> Optional[GroundTruth]:
         """
@@ -269,13 +294,10 @@ class DataCiteClient:
     def __init__(self):
         self.session = _create_session()
         self.base_url = DATACITE_API_BASE
-        self._last_request_time = 0.0
 
     def _rate_limit(self):
-        elapsed = time.time() - self._last_request_time
-        if elapsed < RATE_LIMIT_DELAY:
-            time.sleep(RATE_LIMIT_DELAY - elapsed)
-        self._last_request_time = time.time()
+        """Enforce minimum delay between requests (shared across threads)."""
+        _THROTTLES["DataCite"].wait()
 
     def fetch_by_doi(self, doi: str) -> Optional[GroundTruth]:
         """
@@ -365,13 +387,10 @@ class OpenAlexClient:
     def __init__(self):
         self.session = _create_session()
         self.base_url = OPENALEX_API_BASE
-        self._last_request_time = 0.0
 
     def _rate_limit(self):
-        elapsed = time.time() - self._last_request_time
-        if elapsed < RATE_LIMIT_DELAY:
-            time.sleep(RATE_LIMIT_DELAY - elapsed)
-        self._last_request_time = time.time()
+        """Enforce minimum delay between requests (shared across threads)."""
+        _THROTTLES["OpenAlex"].wait()
 
     def fetch_by_doi(self, doi: str) -> Optional[GroundTruth]:
         """

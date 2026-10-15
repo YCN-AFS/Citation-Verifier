@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _DB_PATH = Path(__file__).parent.parent / "data" / "doi_cache.db"
 _TTL = 7 * 86400  # 7 days in seconds
+_MISSING_TTL = 3600  # DOIs every API answered 404 for: re-check after 1 hour
 _local = threading.local()
 
 
@@ -39,8 +40,39 @@ def _get_conn() -> sqlite3.Connection:
                 cached_at REAL NOT NULL
             )
         """)
+        _local.conn.execute("""
+            CREATE TABLE IF NOT EXISTS doi_missing (
+                doi TEXT PRIMARY KEY,
+                cached_at REAL NOT NULL
+            )
+        """)
         _local.conn.commit()
     return _local.conn
+
+
+def is_known_missing(doi: str) -> bool:
+    """True if every API recently answered 404 for this DOI."""
+    try:
+        row = _get_conn().execute(
+            "SELECT cached_at FROM doi_missing WHERE doi = ?", (doi.lower(),)
+        ).fetchone()
+        return row is not None and (time.time() - row[0]) < _MISSING_TTL
+    except Exception as e:
+        logger.warning("Negative-cache read error for %s: %s", doi, e)
+        return False
+
+
+def set_missing(doi: str):
+    """Remember that a DOI definitively does not exist (short TTL)."""
+    try:
+        conn = _get_conn()
+        conn.execute(
+            "INSERT OR REPLACE INTO doi_missing (doi, cached_at) VALUES (?, ?)",
+            (doi.lower(), time.time()),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.warning("Negative-cache write error for %s: %s", doi, e)
 
 
 def get_cached(doi: str) -> Optional[GroundTruth]:
@@ -137,6 +169,10 @@ def cleanup_expired() -> dict:
         conn.execute(
             "DELETE FROM doi_cache WHERE (? - cached_at) > ?",
             (time.time(), _TTL)
+        )
+        conn.execute(
+            "DELETE FROM doi_missing WHERE (? - cached_at) > ?",
+            (time.time(), _MISSING_TTL),
         )
         conn.commit()
 

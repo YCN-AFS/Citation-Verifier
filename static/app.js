@@ -104,24 +104,22 @@ async function doVerify() {
     progressTitle.textContent = 'Đang xác minh...';
     progressDetail.textContent = 'Phân tích tham chiếu';
 
-    const anim = animProgress();
     try {
-        const r = await fetch('/api/verify', {
+        const r = await fetch('/api/jobs', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ text, cross_validate: crossToggle.checked })
         });
-        clearInterval(anim);
+        if (!r.ok) throw new Error((await r.json()).error || 'HTTP ' + r.status);
+        const { id } = await r.json();
+        data = await pollJob(id);
         progressFill.style.width = '100%';
         progressDetail.textContent = 'Hoàn tất!';
-        if (!r.ok) throw new Error((await r.json()).error || 'HTTP ' + r.status);
-        data = await r.json();
         await sleep(350);
         render();
         // Refresh counters after successful verification
         fetchStats();
     } catch(e) {
-        clearInterval(anim);
         progressTitle.textContent = '❌ Lỗi';
         progressDetail.textContent = e.message;
     } finally {
@@ -129,14 +127,28 @@ async function doVerify() {
     }
 }
 
-function animProgress() {
-    let w = 8;
-    const steps = [[20,'Trích xuất DOI...'],[40,'Truy vấn Crossref...'],[55,'Truy vấn DataCite...'],[70,'Đối chiếu OpenAlex...'],[85,'So khớp mờ...'],[92,'Tổng hợp...']];
-    return setInterval(() => {
-        if (w < 92) { w += Math.random()*3; w = Math.min(w,93); progressFill.style.width = w+'%';
-            for (const [t,m] of steps) if (w >= t && w < t+5) progressDetail.textContent = m;
+// Poll a verification job, showing real progress, until it finishes.
+async function pollJob(id) {
+    let failures = 0;
+    for (;;) {
+        await sleep(1000);
+        let job;
+        try {
+            const r = await fetch(`/api/jobs/${id}`);
+            if (!r.ok) throw new Error((await r.json()).error || 'HTTP ' + r.status);
+            job = await r.json();
+            failures = 0;
+        } catch (e) {
+            if (++failures >= 5) throw e;   // tolerate brief network hiccups
+            continue;
         }
-    }, 700);
+        if (job.status === 'done') return job.result;
+        if (job.status === 'failed') throw new Error(job.error || 'Xác minh thất bại');
+        if (job.total > 0) {
+            progressFill.style.width = (8 + 90 * job.done / job.total) + '%';
+            progressDetail.textContent = `Đã xử lý ${job.done}/${job.total} tham chiếu`;
+        }
+    }
 }
 
 // ─── Render ──────────────────────────────────────────────────

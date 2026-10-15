@@ -222,3 +222,22 @@ def openalex_response_attention():
         },
         "is_retracted": False,
     }
+
+
+# ─── Isolation: never touch the real SQLite databases ─────────
+
+@pytest.fixture(autouse=True)
+def _isolated_databases(tmp_path, monkeypatch):
+    """Point every SQLite-backed module at a per-test temp directory.
+
+    Replacing ``_local`` also drops cached connections held by
+    long-lived threads (e.g. the job pool).
+    """
+    import threading
+
+    from citation_verifier import cache, history, jobs, stats
+
+    for mod, name in ((cache, "doi_cache.db"), (history, "history.db"),
+                      (jobs, "jobs.db"), (stats, "stats.db")):
+        monkeypatch.setattr(mod, "_DB_PATH", tmp_path / name)
+        monkeypatch.setattr(mod, "_local", threading.local())

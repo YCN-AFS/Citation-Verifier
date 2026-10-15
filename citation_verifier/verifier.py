@@ -16,7 +16,7 @@ Performance features:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List
+from typing import Callable, List, Optional
 
 from .api_clients import (
     ApiUnavailable,
@@ -25,7 +25,7 @@ from .api_clients import (
     OpenAlexClient,
     route_doi_to_api,
 )
-from .cache import get_cached, set_cached
+from .cache import get_cached, is_known_missing, set_cached, set_missing
 from .comparator import compare
 from .config import (
     GroundTruth,
@@ -67,7 +67,11 @@ class CitationVerifier:
         self.openalex = OpenAlexClient()
         self.cross_validate = cross_validate
 
-    def verify_text(self, text: str) -> List[VerificationResult]:
+    def verify_text(
+        self,
+        text: str,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ) -> List[VerificationResult]:
         """
         Verify all references found in raw text.
 
@@ -76,6 +80,8 @@ class CitationVerifier:
 
         Args:
             text: Raw multiline text containing academic references.
+            progress_cb: Optional callback ``(done, total)`` invoked once
+                with ``done=0`` after parsing and after each reference.
 
         Returns:
             List of VerificationResult objects, one per reference.
@@ -86,12 +92,28 @@ class CitationVerifier:
         if not references:
             return []
 
+        total = len(references)
+
+        def _report(done: int):
+            if progress_cb:
+                try:
+                    progress_cb(done, total)
+                except Exception as e:  # never let reporting break verification
+                    logger.warning("progress callback failed: %s", e)
+
+        _report(0)
+
         # For small batches (<=3), process sequentially to reduce overhead
-        if len(references) <= 3:
-            return [self._verify_single(ref) for ref in references]
+        if total <= 3:
+            out = []
+            for i, ref in enumerate(references, 1):
+                out.append(self._verify_single(ref))
+                _report(i)
+            return out
 
         # Parallel verification for larger batches
         results = [None] * len(references)
+        completed = 0
 
         with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
             future_to_idx = {
@@ -109,6 +131,8 @@ class CitationVerifier:
                         verdict=Verdict.API_ERROR,
                         error_message=f"Verification error: {str(e)}",
                     )
+                completed += 1
+                _report(completed)
 
         return results
 
@@ -170,6 +194,12 @@ class CitationVerifier:
             ground_truth = cached
             logger.info("Cache HIT for DOI: %s (%s)", doi, cached.api_source)
 
+        if ground_truth is None and is_known_missing(doi):
+            result.verdict = Verdict.DEAD_DOI
+            result.error_message = f"DOI '{doi}' not found in any API."
+            logger.info("Negative-cache HIT for DOI: %s", doi)
+            return result
+
         # Step 1: Try primary API
         # api_failures collects transient errors (timeouts, 5xx, ...). A DOI
         # may only be declared DEAD when every API answered definitively.
@@ -220,6 +250,7 @@ class CitationVerifier:
 
         if ground_truth is None:
             # Every API answered 404 → DEAD_DOI
+            set_missing(doi)
             result.verdict = Verdict.DEAD_DOI
             result.error_message = f"DOI '{doi}' not found in any API."
             logger.warning("DEAD DOI: %s", doi)
