@@ -665,9 +665,6 @@ function renderBenchmark(b) {
     $('benchSubtitle').textContent =
         `${t.cases} lượt đo trên ${b.unique_references} trích dẫn khác nhau · đo ngày ${b.measured_on} · phiên bản ${b.code_version}`;
 
-    const chips = $('benchChips');
-    ['Dữ liệu Crossref thật', 'Có cả trích dẫn bịa & bài bị rút', 'Mã nguồn và bộ thử công khai'].forEach(x => chips.append(el('span', 'bench__chip', x)));
-
     const head = $('benchHeadline');
     [
         [`${t.false_accepts}`, 'Chấp nhận nhầm', 'shield', ''],
