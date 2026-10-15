@@ -37,3 +37,6 @@ jobs:
     - name: Verify imports
       run: |
         python -c "from citation_verifier import __version__; print(f'CiteGuard v{__version__} — all imports OK')"
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v --tb=short
