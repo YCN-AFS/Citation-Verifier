@@ -24,6 +24,7 @@ from .config import (
     GroundTruth,
     MAX_RETRIES,
     OPENALEX_API_BASE,
+    OPENALEX_API_KEY,
     OPENALEX_MAILTO,
     RATE_LIMIT_429_WAIT,
     RATE_LIMIT_DELAY,
@@ -389,6 +390,14 @@ class DataCiteClient:
 # OpenAlex Client
 # ─────────────────────────────────────────────────────────────────────
 
+# When OpenAlex says the daily budget is spent (HTTP 429 with a Retry-After of
+# hours) every further call would fail anyway, so stop calling until we re-check.
+_BUDGET_RECHECK = 3600      # seconds between probes while blocked
+_BUDGET_MIN_RETRY_AFTER = 120   # a Retry-After shorter than this is ordinary throttling
+_openalex_blocked_until = 0.0
+_openalex_lock = threading.Lock()
+
+
 class OpenAlexClient:
     """
     Client for the OpenAlex API.
@@ -400,10 +409,39 @@ class OpenAlexClient:
     def __init__(self):
         self.session = _create_session()
         self.base_url = OPENALEX_API_BASE
+        if OPENALEX_API_KEY:
+            self.session.headers["Authorization"] = f"Bearer {OPENALEX_API_KEY}"
 
     def _rate_limit(self):
         """Enforce minimum delay between requests (shared across threads)."""
         _THROTTLES["OpenAlex"].wait()
+
+    @staticmethod
+    def _check_budget():
+        """Fail fast while OpenAlex's daily budget is known to be spent."""
+        if time.time() < _openalex_blocked_until:
+            raise ApiUnavailable(
+                "OpenAlex: daily request budget exhausted "
+                "(set OPENALEX_API_KEY for a higher limit)"
+            )
+
+    @staticmethod
+    def _note_rate_limit(resp):
+        """Trip the breaker on a 429 whose Retry-After says 'not today'."""
+        global _openalex_blocked_until
+        if resp.status_code != 429:
+            return
+        try:
+            retry_after = float(resp.headers.get("Retry-After", 0))
+        except (TypeError, ValueError):
+            retry_after = 0.0
+        if retry_after >= _BUDGET_MIN_RETRY_AFTER:
+            with _openalex_lock:
+                _openalex_blocked_until = time.time() + min(retry_after, _BUDGET_RECHECK)
+            logger.error(
+                "OpenAlex daily budget exhausted (Retry-After %.0fs); pausing calls for %ds",
+                retry_after, min(retry_after, _BUDGET_RECHECK),
+            )
 
     def fetch_by_doi(self, doi: str) -> Optional[GroundTruth]:
         """
@@ -418,10 +456,12 @@ class OpenAlexClient:
         """
         url = f"{self.base_url}/doi:{doi}"
         params = {"mailto": OPENALEX_MAILTO}
+        self._check_budget()
         self._rate_limit()
 
         try:
             resp = self.session.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            self._note_rate_limit(resp)
 
             if resp.status_code == 404:
                 logger.info("OpenAlex: DOI not found: %s", doi)
@@ -462,10 +502,12 @@ class OpenAlexClient:
             "per_page": per_page,
             "mailto": OPENALEX_MAILTO,
         }
+        self._check_budget()
         self._rate_limit()
 
         try:
             resp = self.session.get(self.base_url, params=params, timeout=REQUEST_TIMEOUT)
+            self._note_rate_limit(resp)
             resp.raise_for_status()
             results = resp.json().get("results", [])
 

@@ -53,6 +53,10 @@ DATACITE_API_BASE = "https://api.datacite.org/dois"
 # OpenAlex (cross-validator and fallback for title search)
 OPENALEX_API_BASE = "https://api.openalex.org/works"
 OPENALEX_MAILTO = _MAILTO
+# Since 2026 OpenAlex gives anonymous requests only a small free daily budget
+# shared by everything behind the same IP (a title search costs 10 credits).
+# A free API key lifts this; it is sent as a Bearer header, never in the URL.
+OPENALEX_API_KEY = os.getenv("OPENALEX_API_KEY", "").strip() or None
 
 # DOI prefix routing: DOIs starting with these prefixes → DataCite
 DATACITE_DOI_PREFIXES = ("10.48550",)  # arXiv

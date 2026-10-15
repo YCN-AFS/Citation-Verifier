@@ -91,3 +91,23 @@ the cited truncated title is too generic for the right paper to be among the top
 the found record lists different authors, or a title-search request was rate-limited
 (`title_only-007` in the hard set: Crossref and OpenAlex both returned HTTP 429, and a failed
 search currently reports NO_DOI rather than API_ERROR).
+
+## Title-search errors, and the OpenAlex daily budget
+
+Title-search failures now surface as `API_ERROR` (not `NO_DOI`) when a source could not be reached
+and nothing was confirmed; successful searches are cached for a day. Re-running the three sets
+afterwards gave **0 false accepts and 0 false rejects**, but most no-DOI cases came back `API_ERROR`
+(hard 65/120, seed101 31/210, original 33/209), so those classes could no longer be measured.
+
+Cause: OpenAlex now gives requests without an API key a small free daily budget **shared by every
+client behind the same IP** (a title search costs 10 credits, so roughly 100 searches/day). The
+benchmark runs exhausted it (`HTTP 429`, `Retry-After: 66313`, reset at midnight UTC). Consequences:
+
+* Before this change that 429 was silently reported as `NO_DOI`; it is now correctly `API_ERROR`.
+* The deployed build (`63ef9e1`) still honours an unbounded `Retry-After`, so a DOI check with
+  cross-validation could block a worker until Gunicorn's timeout while the budget is spent.
+  Fixed on this branch (bounded retry policy, plus a circuit breaker that stops calling OpenAlex
+  for up to an hour once it reports an exhausted budget).
+* Production needs a free `OPENALEX_API_KEY` (sent as a Bearer header, never in the URL).
+
+Rerun the benchmark with a key (or after the budget resets) to measure the no-DOI classes again.
