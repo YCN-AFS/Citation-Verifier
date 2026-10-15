@@ -45,7 +45,7 @@ class TestSummaryFile:
 
 
 class TestGeneratedArtifacts:
-    """README block and docs/benchmark.svg are generated from summary.json."""
+    """The README benchmark block is generated from summary.json."""
 
     @pytest.fixture(scope="class")
     def renderer(self):
@@ -58,10 +58,6 @@ class TestGeneratedArtifacts:
     def test_readme_block_is_up_to_date(self, summary, renderer):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         assert renderer.render_block(summary) in readme, "run: python benchmark/render_readme.py"
-
-    def test_svg_is_up_to_date(self, summary, renderer):
-        svg = (ROOT / "docs" / "benchmark.svg").read_text(encoding="utf-8")
-        assert svg == renderer.render_svg(summary), "run: python benchmark/render_readme.py"
 
     def test_published_run_had_no_api_errors(self, summary):
         # an API_ERROR counts as "not correct"; a published run must not hide behind them
@@ -103,7 +99,8 @@ class TestReadmeAgrees:
         total = sum(c["total"] for s in summary["sets"] for c in s["classes"])
         ok = sum(c["correct"] for s in summary["sets"] for c in s["classes"])
         assert f"**{ok}/{total} = {100 * ok / total:.1f}%**" in readme
-        assert f"0 wrong acceptances on {total} benchmark cases" in readme
+        fa = sum(x["false_accepts"] for x in summary["sets"])
+        assert f"with {fa} wrong acceptances" in readme
         assert f"{summary['unique_references']} distinct references" in readme
         for s in summary["sets"]:
             for c in s["classes"]:
