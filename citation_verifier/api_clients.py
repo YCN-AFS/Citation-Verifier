@@ -498,7 +498,8 @@ class OpenAlexClient:
             Raises ApiUnavailable on network/server errors.
         """
         params = {
-            "search": strip_markup(title),
+            # OpenAlex answers HTTP 400 when '?' appears inside the search string
+            "search": " ".join(strip_markup(title).replace("?", " ").split()),
             "per_page": per_page,
             "mailto": OPENALEX_MAILTO,
         }

@@ -85,3 +85,12 @@ class TestApiKey:
     def test_no_key_no_header(self, monkeypatch):
         monkeypatch.setattr(api_clients, "OPENALEX_API_KEY", None)
         assert "Authorization" not in OpenAlexClient().session.headers
+
+
+class TestSearchQuerySanitizing:
+    def test_question_mark_is_not_sent_to_openalex(self):
+        c = _client(_resp(200, body={"results": []}))
+        c.search_candidates("Did it work? Evidence from China")
+        _, kwargs = c.session.get.call_args
+        assert "?" not in kwargs["params"]["search"]
+        assert kwargs["params"]["search"] == "Did it work Evidence from China"
